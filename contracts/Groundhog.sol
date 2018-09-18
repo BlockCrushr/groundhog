@@ -199,15 +199,27 @@ contract GroundhogWallet is GnosisSafe, IERC948 {
         return abi.encodePacked(byte(0x19), byte(1), domainSeparator, safeSubTxHash);
     }
 
-
-    function bytesToUint(bytes _bytes, uint _start) internal pure returns (uint oUint) {
+    /// @dev converts bytes array to uint256
+    /// @param _bytes array to splice from
+    /// @param _start start position in the array
+    /// @return oUint uint256
+    function bytesToUint(bytes _bytes, uint _start)
+    internal
+    pure
+    returns (uint256 oUint) {
         require(_bytes.length >= (_start + 32));
         assembly {
             oUint := mload(add(add(_bytes, 0x20), _start))
         }
     }
-
-    function bytesToAddress(bytes _bytes, uint _start) internal pure returns (address oAddress) {
+    /// @dev converts bytes array to address
+    /// @param _bytes array to splice from
+    /// @param _start start position in the array
+    /// @return oAddress address
+    function bytesToAddress(bytes _bytes, uint _start)
+    internal
+    pure
+    returns (address oAddress) {
         require(_bytes.length >= (_start + 20));
         assembly {
             oAddress := div(mload(add(add(_bytes, 0x20), _start)), 0x1000000000000000000000000)
