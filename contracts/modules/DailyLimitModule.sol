@@ -43,9 +43,9 @@ contract DailyLimitModule is Module {
     }
 
     /// @dev Returns if Safe transaction is a valid daily limit transaction.
-    /// @param token Address of the token that should be transfered (0 for Ether)
-    /// @param to Address to which the tokens should be transfered
-    /// @param amount Amount of tokens (or Ether) that should be transfered
+    /// @param token Address of the token that should be transferred (0 for Ether)
+    /// @param to Address to which the tokens should be transferred
+    /// @param amount Amount of tokens (or Ether) that should be transferred
     /// @return Returns if transaction can be executed.
     function executeDailyLimit(address token, address to, uint256 amount)
         public

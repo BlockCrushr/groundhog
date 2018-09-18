@@ -16,6 +16,8 @@ contract('GnosisSafePersonalEdition using nested safes', function(accounts) {
 
     const CALL = 0
 
+    const TX = 0, SUB_TX = 0; // enumType
+
     beforeEach(async function () {
         // Create lightwallet
         lw = await utils.createLightwallet()
@@ -64,7 +66,7 @@ contract('GnosisSafePersonalEdition using nested safes', function(accounts) {
         
         let sigs = "0x"
         let nonce = await gnosisSafe.nonce()
-        let messageData = await gnosisSafe.encodeTransactionData(to, value, data, operation, 0, 0, 0, 0, 0, nonce)
+        let messageData = await gnosisSafe.encodeTransactionData(TX,to, value, data, operation, 0, 0, 0, 0, 0, nonce)
 
         let signMessageData = owner1Safe.contract.signMessage.getData(messageData)
         // Use on-chain Safe signature
