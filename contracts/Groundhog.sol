@@ -26,12 +26,22 @@ contract GroundhogWallet is GnosisSafe, IERC948 {
     /// @dev Allows to execute a Safe transaction confirmed by required number of owners and then pays the account that submitted the transaction.
     ///      Note: The fees are always transferred, even if the user transaction fails.
     /// @param subscriptionHash bytes32 hash of on chain sub
+    /// @param subscriptionHashData bytes of the input data that was hashed and agreed to, encodeSubscriptionData
+    /// @return bool isValid returns the validity of the subscription
     function isValidSubscription(
-        bytes32 subscriptionHash
+        bytes32 subscriptionHash,
+        bytes subscriptionHashData,
+        bytes signatures
     )
     public
+    view
     returns (bool isValid) {
-        return (subscriptions[subscriptionHash].status == GEnum.SubscriptionStatus.VALID);
+        if(subscriptions[subscriptionHash].status == GEnum.SubscriptionStatus.VALID) {
+            return true;
+        } else {
+            return (checkSignatures(subscriptionHash, subscriptionHashData, signatures, false), "Invalid signatures provided");
+        }
+        return false;
     }
 
     /// @dev Allows to execute a Safe transaction confirmed by required number of owners and then pays the account that submitted the transaction.
@@ -99,6 +109,11 @@ contract GroundhogWallet is GnosisSafe, IERC948 {
         }
     }
 
+
+    /// @dev used to help mitigate stack issues
+    /// @param subHash bytes32
+    /// @param meta bytes packed meta data
+    /// @returns bool
     function processSub(
         bytes32 subHash,
         bytes meta // refundAddress / period / offChainID / expires
@@ -122,6 +137,8 @@ contract GroundhogWallet is GnosisSafe, IERC948 {
             sub.nextWithdraw = now + 7 days;
         } else if (period == uint(GEnum.Period.MONTH)) {
             sub.nextWithdraw = now + 30 days;
+        } else {
+            return false;
         }
 
         if (sub.offChainID == 0) {
