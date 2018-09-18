@@ -2,18 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="b99e21b1-9ad8-47fe-a79f-1ee8aab811ea" name="Default" comment="">
-      <change afterPath="$PROJECT_DIR$/contracts/Groundhog.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/common/GEnum.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/interfaces/IERC940.sol" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/contracts/GnosisSafe.sol" beforeDir="false" afterPath="$PROJECT_DIR$/contracts/GnosisSafe.sol" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/contracts/modules/DailyLimitModule.sol" beforeDir="false" afterPath="$PROJECT_DIR$/contracts/modules/DailyLimitModule.sol" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/migrations/2_deploy_contracts.js" beforeDir="false" afterPath="$PROJECT_DIR$/migrations/2_deploy_contracts.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/test/createAndAddModules.js" beforeDir="false" afterPath="$PROJECT_DIR$/test/createAndAddModules.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/test/gnosisSafePersonalEditionNestedSafes.js" beforeDir="false" afterPath="$PROJECT_DIR$/test/gnosisSafePersonalEditionNestedSafes.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/test/gnosisSafeTeamEdition.js" beforeDir="false" afterPath="$PROJECT_DIR$/test/gnosisSafeTeamEdition.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/truffle.js" beforeDir="false" afterPath="$PROJECT_DIR$/truffle.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/contracts/Groundhog.sol" beforeDir="false" afterPath="$PROJECT_DIR$/contracts/Groundhog.sol" afterDir="false" />
     </list>
     <ignored path="$PROJECT_DIR$/.tmp/" />
     <ignored path="$PROJECT_DIR$/temp/" />
@@ -46,12 +36,12 @@
       </usages-collector>
       <usages-collector id="statistics.file.extensions.edit">
         <counts>
-          <entry key="sol" value="3441" />
+          <entry key="sol" value="3453" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.types.edit">
         <counts>
-          <entry key="Solidity file" value="3441" />
+          <entry key="Solidity file" value="3453" />
         </counts>
       </usages-collector>
     </session>
@@ -67,20 +57,20 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="false">
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/contracts/Groundhog.sol">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-100">
-              <caret line="127" column="32" selection-start-line="127" selection-start-column="32" selection-end-line="127" selection-end-column="32" />
+            <state relative-caret-position="1981">
+              <caret line="174" column="28" selection-start-line="174" selection-start-column="28" selection-end-line="174" selection-end-column="28" />
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/contracts/interfaces/IERC940.sol">
+        <entry file="file://$PROJECT_DIR$/contracts/interfaces/IERC948.sol">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="90">
-              <caret line="6" column="3" selection-start-line="6" selection-start-column="3" selection-end-line="6" selection-end-column="3" />
+            <state relative-caret-position="30">
+              <caret line="2" column="16" selection-start-line="2" selection-start-column="9" selection-end-line="2" selection-end-column="16" />
             </state>
           </provider>
         </entry>
@@ -103,7 +93,7 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/contracts/common/SecuredTokenTransfer.sol">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="270">
@@ -152,7 +142,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>offChainNonce\</find>
       <find>offChainNonce</find>
       <find>Enum.Type</find>
       <find>requiredTxGas</find>
@@ -182,6 +171,7 @@
       <find>isValid</find>
       <find>OwnerManag</find>
       <find>// period / offChainID / expires / refundAddress</find>
+      <find>IERC948</find>
     </findStrings>
     <replaceStrings>
       <replace />
@@ -313,12 +303,12 @@
       <workItem from="1536796050040" duration="16366000" />
       <workItem from="1536951329921" duration="5589000" />
       <workItem from="1536958966285" duration="2947000" />
-      <workItem from="1537208130897" duration="8707000" />
+      <workItem from="1537208130897" duration="9559000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="33609000" />
+    <option name="totallyTimeSpent" value="34461000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="1" y="22" width="1920" height="1178" extended-state="6" />
@@ -327,9 +317,9 @@
       <window_info id="npm" order="0" side_tool="true" />
       <window_info id="Favorites" order="1" side_tool="true" />
       <window_info id="Structure" order="2" side_tool="true" weight="0.25" />
-      <window_info active="true" content_ui="combo" id="Project" order="3" visible="true" weight="0.24960506" />
+      <window_info content_ui="combo" id="Project" order="3" visible="true" weight="0.24960506" />
       <window_info anchor="bottom" id="Docker" order="0" show_stripe_button="false" />
-      <window_info anchor="bottom" id="Terminal" order="1" visible="true" weight="0.40239412" />
+      <window_info active="true" anchor="bottom" id="Terminal" order="1" visible="true" weight="0.40239412" />
       <window_info anchor="bottom" id="Event Log" order="2" side_tool="true" />
       <window_info anchor="bottom" id="Version Control" order="3" />
       <window_info anchor="bottom" id="Message" order="4" />
@@ -347,9 +337,9 @@
       <window_info id="npm" order="0" side_tool="true" />
       <window_info id="Favorites" order="1" side_tool="true" />
       <window_info id="Structure" order="2" side_tool="true" weight="0.25" />
-      <window_info active="true" content_ui="combo" id="Project" order="3" visible="true" weight="0.24960506" />
+      <window_info content_ui="combo" id="Project" order="3" visible="true" weight="0.24960506" />
       <window_info anchor="bottom" id="Docker" order="0" show_stripe_button="false" />
-      <window_info anchor="bottom" id="Terminal" order="1" visible="true" weight="0.26058933" />
+      <window_info active="true" anchor="bottom" id="Terminal" order="1" visible="true" weight="0.40239412" />
       <window_info anchor="bottom" id="Event Log" order="2" side_tool="true" />
       <window_info anchor="bottom" id="Version Control" order="3" />
       <window_info anchor="bottom" id="Message" order="4" />
@@ -576,13 +566,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/contracts/interfaces/IERC940.sol">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="90">
-          <caret line="6" column="3" selection-start-line="6" selection-start-column="3" selection-end-line="6" selection-end-column="3" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/contracts/common/ERC948.sol">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="225">
@@ -604,17 +587,24 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/contracts/Groundhog.sol">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-100">
-          <caret line="127" column="32" selection-start-line="127" selection-start-column="32" selection-end-line="127" selection-end-column="32" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/contracts/common/SecuredTokenTransfer.sol">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="270">
           <caret line="18" column="5" selection-start-line="18" selection-start-column="5" selection-end-line="18" selection-end-column="5" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/contracts/interfaces/IERC948.sol">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="30">
+          <caret line="2" column="16" selection-start-line="2" selection-start-column="9" selection-end-line="2" selection-end-column="16" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/contracts/Groundhog.sol">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1981">
+          <caret line="174" column="28" selection-start-line="174" selection-start-column="28" selection-end-line="174" selection-end-column="28" />
         </state>
       </provider>
     </entry>

@@ -143,7 +143,7 @@ contract GroundhogWallet is GnosisSafe, IERC948 {
     /// @param dataGas Gas costs for data used to trigger the safe transaction.
     /// @param gasPrice Maximum gas price that should be used for this transaction.
     /// @param gasToken Token address (or 0 if ETH) that is used for the payment.
-    /// @return Transaction hash.
+    /// @return Subscription hash.
     function getSubscriptionHash(
         address to,
         uint256 value,
@@ -172,7 +172,7 @@ contract GroundhogWallet is GnosisSafe, IERC948 {
     /// @param dataGas Gas costs for data used to trigger the safe transaction.
     /// @param gasPrice Maximum gas price that should be used for this transaction.
     /// @param gasToken Token address (or 0 if ETH) that is used for the payment.
-    /// @return Transaction hash bytes.
+    /// @return Subscription hash bytes.
     function encodeSubscriptionData(
         address to,
         uint256 value,
