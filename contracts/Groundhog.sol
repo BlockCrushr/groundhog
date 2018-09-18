@@ -3,7 +3,7 @@ pragma solidity 0.4.24;
 import "./common/GEnum.sol";
 import "./common/Enum.sol";
 import "./GnosisSafe.sol";
-import "./interfaces/IERC940.sol";
+import "./interfaces/IERC948.sol";
 
 contract GroundhogWallet is GnosisSafe, IERC948 {
 
