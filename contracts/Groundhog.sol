@@ -7,6 +7,9 @@ import "./interfaces/IERC948.sol";
 
 contract GroundhogWallet is GnosisSafe, IERC948 {
 
+    //keccak256(
+    //  "SafeSubTx(address to, uint256 value, bytes data, Enum.Operation operation, uint256 safeTxGas, uint256 dataGas, uint256 gasPrice, address gasToken, bytes meta)"
+    //)
     bytes32 public constant SAFE_SUB_TX_TYPEHASH = 0x2a1fd34b6cdf5651c9b7ad3362b2310b9883a1d7010ac9b9a7e26876b9418068;
 
     event PaymentFailed(bytes32 subHash);
@@ -98,7 +101,7 @@ contract GroundhogWallet is GnosisSafe, IERC948 {
 
     function processSub(
         bytes32 subHash,
-        bytes meta
+        bytes meta // refundAddress / period / offChainID / expires
     )
     internal
     returns (bool) {
@@ -172,6 +175,7 @@ contract GroundhogWallet is GnosisSafe, IERC948 {
     /// @param dataGas Gas costs for data used to trigger the safe transaction.
     /// @param gasPrice Maximum gas price that should be used for this transaction.
     /// @param gasToken Token address (or 0 if ETH) that is used for the payment.
+    /// @param meta bytes packed data(refund address, period, offChainID, expires
     /// @return Subscription hash bytes.
     function encodeSubscriptionData(
         address to,
