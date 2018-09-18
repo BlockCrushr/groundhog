@@ -1,5 +1,5 @@
 {
-  "name": "gnosis-safe",
+  "name": "groundhog-safe",
   "version": "0.0.2",
   "description": "Ethereum multisig contract",
   "license": "GPL-3.0",
@@ -21,9 +21,9 @@
     "Wallet",
     "Safe"
   ],
-  "author": "stefan@gnosis.pm",
+  "author": "andrew@groundhog.network",
   "bugs": {
-    "url": "https://github.com/gnosis/gnosis-safe/issues"
+    "url": "https://github.com/blockcrushr/groundhog/issues"
   },
   "devDependencies": {
     "@digix/tempo": "^0.2.0",

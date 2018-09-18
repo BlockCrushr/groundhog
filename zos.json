@@ -4,6 +4,7 @@
   "lib": true,
   "contracts": {
     "GnosisSafe": "GnosisSafe",
+    "GroundhogWallet": "Groundhog",
     "CreateAndAddModules": "CreateAndAddModules",
     "MultiSend": "MultiSend",
     "DailyLimitModule": "DailyLimitModule",

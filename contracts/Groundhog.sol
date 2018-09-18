@@ -34,12 +34,11 @@ contract GroundhogWallet is GnosisSafe, IERC948 {
         bytes signatures
     )
     public
-    view
     returns (bool isValid) {
         if(subscriptions[subscriptionHash].status == GEnum.SubscriptionStatus.VALID) {
             return true;
         } else {
-            return (checkSignatures(subscriptionHash, subscriptionHashData, signatures, false), "Invalid signatures provided");
+            return (checkSignatures(subscriptionHash, subscriptionHashData, signatures, false));
         }
         return false;
     }
@@ -113,7 +112,7 @@ contract GroundhogWallet is GnosisSafe, IERC948 {
     /// @dev used to help mitigate stack issues
     /// @param subHash bytes32
     /// @param meta bytes packed meta data
-    /// @returns bool
+    /// @return bool
     function processSub(
         bytes32 subHash,
         bytes meta // refundAddress / period / offChainID / expires
