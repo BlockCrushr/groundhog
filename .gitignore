@@ -4,3 +4,4 @@ node_modules/
 .zos.session
 .vscode/
 env/
+.idea
