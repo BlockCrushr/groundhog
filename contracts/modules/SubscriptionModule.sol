@@ -1,5 +1,4 @@
 pragma solidity ^0.5.0;
-
 import "../base/Module.sol";
 import "../base/OwnerManager.sol";
 import "../common/GEnum.sol";
@@ -12,7 +11,6 @@ import "../external/SafeMath.sol";
 contract SubscriptionModule is Module, SignatureDecoder {
 
     using BokkyPooBahsDateTimeLibrary for uint;
-
     using SafeMath for uint;
     string public constant NAME = "Groundhog";
     string public constant VERSION = "0.0.1";
@@ -25,7 +23,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
     bytes32 public constant DOMAIN_SEPARATOR_TYPEHASH = 0x035aff83d86937d35b32e04f0ddc6ff469290eef2f1b692d8a815c89404d4749;
 
     //keccak256(
-    //  "SafeSubTx(address to,uint256 value,bytes data,uint8 operation,uint256 safeTxGas,uint256 dataGas,uint256 gasPrice,address gasToken,address refundAddress,bytes meta)"
+    //  "SafeSubTx(address to,uint256 value,bytes data,uint8 operation,uint256 safeTxGas,uint256 dataGas,uint256 gasPrice,address gasToken,address refundAddress,bytes memory meta)"
     //)
     bytes32 public constant SAFE_SUB_TX_TYPEHASH = 0x180e6fe977456676413d21594ff72b84df056409812ba2e51d28187117f143c2;
 
@@ -43,9 +41,10 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
     /// @dev Setup function sets manager
     function setup()
-    public
+        external
     {
-        require(setManager() && domainSeparator == 0, "Domain Separator already set!");
+        setManager();
+        require(domainSeparator == 0, "Domain Separator already set!");
         domainSeparator = keccak256(abi.encode(DOMAIN_SEPARATOR_TYPEHASH, this));
     }
 
@@ -59,7 +58,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
     /// @param dataGas Gas costs for data used to trigger the safe transaction and to pay the payment transfer
     /// @param gasPrice Gas price that should be used for the payment calculation.
     /// @param gasToken Token address (or 0 if ETH) that is used for the payment.
-    /// @param refundAddress payout address or 0 if tx.origin
+    /// @param refundReceiver payout address or 0 if tx.origin
     /// @param meta Packed bytes data {address refundReceiver (required}, {uint256 period (required}, {uint256 offChainID (required}, {uint256 expires (optional}
     /// @param signatures Packed signature data ({bytes32 r}{bytes32 s}{uint8 v})
     /// @return success boolean value of execution
@@ -74,17 +73,17 @@ contract SubscriptionModule is Module, SignatureDecoder {
         uint256 gasPrice,
         address gasToken,
         address payable refundReceiver,
-        bytes meta,
+        bytes calldata meta,
         bytes calldata signatures
     )
-    public
-    returns (bool success)
+        external
+        returns (bool success)
     {
         uint256 startGas = gasleft();
 
         bytes memory subHashData = encodeSubscriptionData(
             to, value, data, operation, // Transaction info
-            safeTxGas, dataGas, gasPrice, gasToken, refundAddress,
+            safeTxGas, dataGas, gasPrice, gasToken, refundReceiver,
             meta
         );
 
@@ -101,15 +100,14 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
         // We transfer the calculated tx costs to the refundReceiver to avoid sending it to intermediate contracts that have made calls
         if (gasPrice > 0) {
-            handleTxPayment(startGas, dataGas, gasPrice, gasToken, refundAddress);
+            handleTxPayment(startGas, dataGas, gasPrice, gasToken, refundReceiver);
         }
-
     }
 
-    function processMeta(bytes meta)
-    internal
-    pure
-    returns (uint256[3] outMeta) {
+    function processMeta(bytes memory meta)
+        internal
+        pure
+    returns (uint256[3] memory outMeta) {
         uint256 period;
         uint256 offChainID;
         uint256 expire;
@@ -130,8 +128,8 @@ contract SubscriptionModule is Module, SignatureDecoder {
     }
 
 
-    function paySubscription(address to, uint256 value, bytes data, Enum.Operation operation, bytes32 subHash, bytes meta)
-    internal
+    function paySubscription(address to, uint256 value, bytes memory data, Enum.Operation operation, bytes32 subHash, bytes memory meta)
+        internal
     returns (bool success) {
 
         success = processSub(subHash, processMeta(meta));
@@ -146,7 +144,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
         address gasToken,
         address refundReceiver
     )
-    internal
+        internal
     {
         uint256 amount = ((gasUsed - gasleft()) + dataGas) * gasPrice;
         // solium-disable-next-line security/no-tx-origin
@@ -162,20 +160,20 @@ contract SubscriptionModule is Module, SignatureDecoder {
     }
 
 
-    function checkHash(bytes32 transactionHash, bytes signatures)
-    internal
-    view
+    function checkHash(bytes32 transactionHash, bytes memory signatures)
+        internal
+        view
     returns (bool valid) {
         // There cannot be an owner with address 0.
         address lastOwner = address(0);
         address currentOwner;
         uint256 i;
-        uint256 threshold = OwnerManager(manager).getThreshold();
+        uint256 threshold = OwnerManager(address(manager)).getThreshold();
         // Validate threshold is reached.
         valid = false;
         for (i = 0; i < threshold; i++) {
             currentOwner = recoverKey(transactionHash, signatures, i);
-            require(OwnerManager(manager).isOwner(currentOwner), "Signature not provided by owner");
+            require(OwnerManager(address(manager)).isOwner(currentOwner), "Signature not provided by owner");
             require(currentOwner > lastOwner, "Signatures are not ordered by owner address");
             lastOwner = currentOwner;
         }
@@ -189,10 +187,10 @@ contract SubscriptionModule is Module, SignatureDecoder {
     /// @return bool isValid returns the validity of the subscription
     function isValidSubscription(
         bytes32 subscriptionHash,
-        bytes signatures
+        bytes calldata signatures
     )
-    public
-    view
+        external
+        view
     returns (bool isValid) {
         if (subscriptions[subscriptionHash].status == GEnum.SubscriptionStatus.VALID) {
             return true;
@@ -211,18 +209,19 @@ contract SubscriptionModule is Module, SignatureDecoder {
     function cancelSubscription(
         address to,
         uint256 value,
-        bytes data,
+        bytes calldata data,
         Enum.Operation operation,
         uint256 safeTxGas,
         uint256 dataGas,
         uint256 gasPrice,
         address gasToken,
         address refundAddress,
-        bytes meta,
-        bytes signatures
+        bytes calldata meta,
+        bytes calldata signatures
     )
-    public
-    returns (bool) {
+        external
+        returns (bool)
+    {
 
 
         bytes memory subHashData = encodeSubscriptionData(
@@ -234,8 +233,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
         require(checkHash(keccak256(subHashData), signatures), "Invalid signatures provided");
 
-        Meta storage sub = subscriptions[keccak256(subHashData)];
-        sub.status = GEnum.SubscriptionStatus.CANCELLED;
+        subscriptions[keccak256(subHashData)].status = GEnum.SubscriptionStatus.CANCELLED;
 
         return true;
     }
@@ -244,10 +242,11 @@ contract SubscriptionModule is Module, SignatureDecoder {
     /// @return bool
     function processSub(
         bytes32 subHash,
-        uint256[3] pmeta
+        uint256[3] memory pmeta
     )
-    internal
-    returns (bool) {
+        internal
+        returns (bool)
+    {
         uint256 period = pmeta[0];
         uint256 offChainID = pmeta[1];
         uint256 expires = pmeta[2];
@@ -270,7 +269,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
             }
         }
 
-        require(((sub.status == GEnum.SubscriptionStatus.VALID && now >= sub.nextWithdraw) && BokkyPooBahsDateTimeLibrary.diffMinutes()), "Withdraw Cooldown");
+        require((sub.status == GEnum.SubscriptionStatus.VALID && now >= sub.nextWithdraw), "Subscription Withdraw on CoolDown");
 
         if (period == uint(GEnum.Period.DAY)) {
             sub.nextWithdraw = BokkyPooBahsDateTimeLibrary.addDays(sub.nextWithdraw, 1);
@@ -296,9 +295,9 @@ contract SubscriptionModule is Module, SignatureDecoder {
         uint256 offChainID,
         uint256 expires
     )
-    public
-    pure
-    returns (bytes) {
+        external
+        pure
+    returns (bytes memory) {
         return abi.encodePacked(period, offChainID, expires);
     }
 
@@ -320,17 +319,17 @@ contract SubscriptionModule is Module, SignatureDecoder {
     function getSubscriptionHash(
         address to,
         uint256 value,
-        bytes data,
+        bytes memory data,
         Enum.Operation operation,
         uint256 safeTxGas,
         uint256 dataGas,
         uint256 gasPrice,
         address gasToken,
         address refundAddress,
-        bytes meta // period / offChainID / expires
+        bytes memory meta
     )
-    public
-    view
+        public
+        view
     returns (bytes32)
     {
         return keccak256(encodeSubscriptionData(to, value, data, operation, safeTxGas, dataGas, gasPrice, gasToken, refundAddress, meta));
@@ -351,24 +350,23 @@ contract SubscriptionModule is Module, SignatureDecoder {
     function encodeSubscriptionData(
         address to,
         uint256 value,
-        bytes data,
+        bytes memory data,
         Enum.Operation operation,
         uint256 safeTxGas,
         uint256 dataGas,
         uint256 gasPrice,
         address gasToken,
         address refundAddress,
-        bytes meta
+        bytes memory meta
     )
-    public
-    view
-    returns (bytes)
+        public
+        view
+    returns (bytes memory)
     {
-
         bytes32 safeSubTxHash = keccak256(
             abi.encode(SAFE_SUB_TX_TYPEHASH, to, value, keccak256(data), operation, safeTxGas, dataGas, gasPrice, gasToken, refundAddress, keccak256(meta))
         );
-        return abi.encodePacked(byte(0x19), byte(1), domainSeparator, safeSubTxHash);
+        return abi.encodePacked(byte(0x19), byte(0x01), domainSeparator, safeSubTxHash);
     }
 
     /// @dev Allows to estimate a Safe transaction.
@@ -382,9 +380,9 @@ contract SubscriptionModule is Module, SignatureDecoder {
     /// @param data Data payload of Safe transaction.
     /// @param operation Operation type of Safe transaction.
     /// @return Estimate without refunds and overhead fees (base transaction and payload data gas costs).
-    function requiredTxGas(address to, uint256 value, bytes memory data, Enum.Operation operation, bytes meta)
-    public
-    authorized
+    function requiredTxGas(address to, uint256 value, bytes calldata data, Enum.Operation operation, bytes calldata meta)
+        external
+        authorized
     returns (uint256)
     {
         uint256 startGas = gasleft();
