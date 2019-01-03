@@ -104,10 +104,13 @@ contract SubscriptionModule is Module, SignatureDecoder {
         }
     }
 
-    function processMeta(bytes memory meta)
+    function processMeta(
+        bytes memory meta
+    )
         internal
         pure
-    returns (uint256[3] memory outMeta) {
+        returns (uint256[3] memory outMeta)
+    {
         uint256 period;
         uint256 offChainID;
         uint256 expire;
@@ -127,10 +130,17 @@ contract SubscriptionModule is Module, SignatureDecoder {
         return [period, offChainID, expire];
     }
 
-
-    function paySubscription(address to, uint256 value, bytes memory data, Enum.Operation operation, bytes32 subHash, bytes memory meta)
+    function paySubscription(
+        address to,
+        uint256 value,
+        bytes memory data,
+        Enum.Operation operation,
+        bytes32 subHash,
+        bytes memory meta
+    )
         internal
-    returns (bool success) {
+        returns (bool success)
+    {
 
         success = processSub(subHash, processMeta(meta));
 
@@ -142,9 +152,9 @@ contract SubscriptionModule is Module, SignatureDecoder {
         uint256 dataGas,
         uint256 gasPrice,
         address gasToken,
-        address refundReceiver
+        address payable refundReceiver
     )
-        internal
+        private
     {
         uint256 amount = ((gasUsed - gasleft()) + dataGas) * gasPrice;
         // solium-disable-next-line security/no-tx-origin
@@ -160,10 +170,14 @@ contract SubscriptionModule is Module, SignatureDecoder {
     }
 
 
-    function checkHash(bytes32 transactionHash, bytes memory signatures)
+    function checkHash(
+        bytes32 transactionHash,
+        bytes memory signatures
+    )
         internal
         view
-    returns (bool valid) {
+        returns (bool valid)
+    {
         // There cannot be an owner with address 0.
         address lastOwner = address(0);
         address currentOwner;
@@ -191,7 +205,8 @@ contract SubscriptionModule is Module, SignatureDecoder {
     )
         external
         view
-    returns (bool isValid) {
+        returns (bool isValid)
+    {
         if (subscriptions[subscriptionHash].status == GEnum.SubscriptionStatus.VALID) {
             return true;
         } else if (subscriptions[subscriptionHash].status == GEnum.SubscriptionStatus.EXPIRED) {
@@ -222,8 +237,6 @@ contract SubscriptionModule is Module, SignatureDecoder {
         external
         returns (bool)
     {
-
-
         bytes memory subHashData = encodeSubscriptionData(
             to, value, data, operation, // Transaction info
             safeTxGas, dataGas, gasPrice, gasToken, refundAddress,
@@ -297,13 +310,10 @@ contract SubscriptionModule is Module, SignatureDecoder {
     )
         external
         pure
-    returns (bytes memory) {
+        returns (bytes memory)
+    {
         return abi.encodePacked(period, offChainID, expires);
     }
-
-
-
-
 
     /// @dev Returns hash to be signed by owners.
     /// @param to Destination address.
@@ -330,7 +340,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
     )
         public
         view
-    returns (bytes32)
+        returns (bytes32)
     {
         return keccak256(encodeSubscriptionData(to, value, data, operation, safeTxGas, dataGas, gasPrice, gasToken, refundAddress, meta));
     }
@@ -361,7 +371,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
     )
         public
         view
-    returns (bytes memory)
+        returns (bytes memory)
     {
         bytes32 safeSubTxHash = keccak256(
             abi.encode(SAFE_SUB_TX_TYPEHASH, to, value, keccak256(data), operation, safeTxGas, dataGas, gasPrice, gasToken, refundAddress, keccak256(meta))
@@ -380,10 +390,16 @@ contract SubscriptionModule is Module, SignatureDecoder {
     /// @param data Data payload of Safe transaction.
     /// @param operation Operation type of Safe transaction.
     /// @return Estimate without refunds and overhead fees (base transaction and payload data gas costs).
-    function requiredTxGas(address to, uint256 value, bytes calldata data, Enum.Operation operation, bytes calldata meta)
+    function requiredTxGas(
+        address to,
+        uint256 value,
+        bytes calldata data,
+        Enum.Operation operation,
+        bytes calldata meta
+    )
         external
         authorized
-    returns (uint256)
+        returns (uint256)
     {
         uint256 startGas = gasleft();
         // We don't provide an error message here, as we use it to return the estimate
