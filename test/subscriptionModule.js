@@ -159,11 +159,11 @@ contract('SubscriptionModule', function (accounts) {
             to, value, data, operation, txGasEstimate, dataGasEstimate, gasPrice, txGasToken, executor, meta, sigs, {from: executor, gas:8000000}
         );
 
-        let events = utils.checkTxEvent(tx, 'PaymentFailed', subscriptionModule.address, txFailed, subject)
-        if (txFailed) {
-            let subHash = await subscriptionModule.getSubscriptionHash(accounts, to, value, data, operation, txGasEstimate, dataGasEstimate, gasPrice, txGasToken, executor, meta)
-            assert.equal(subHash, events.args.subHash)
-        }
+        // let events = utils.checkTxEvent(tx, 'PaymentFailed', subscriptionModule.address, txFailed, subject)
+        // if (txFailed) {
+        //     let subHash = await subscriptionModule.getSubscriptionHash(accounts, to, value, data, operation, txGasEstimate, dataGasEstimate, gasPrice, txGasToken, executor, meta)
+        //     assert.equal(subHash, events.args.subHash)
+        // }
         return tx;
     }
 

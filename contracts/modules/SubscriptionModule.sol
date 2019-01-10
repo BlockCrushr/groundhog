@@ -41,7 +41,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
     /// @dev Setup function sets manager
     function setup()
-        external
+        public
     {
         setManager();
         require(domainSeparator == 0, "Domain Separator already set!");
@@ -66,18 +66,17 @@ contract SubscriptionModule is Module, SignatureDecoder {
     function execSubscription(
         address to,
         uint256 value,
-        bytes calldata data,
+        bytes memory data,
         Enum.Operation operation,
         uint256 safeTxGas,
         uint256 dataGas,
         uint256 gasPrice,
         address gasToken,
         address payable refundReceiver,
-        bytes calldata meta,
-        bytes calldata signatures
+        bytes memory meta,
+        bytes memory signatures
     )
-        external
-        returns (bool success)
+        public
     {
         uint256 startGas = gasleft();
 
@@ -91,12 +90,8 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
         require(checkHash(keccak256(subHashData), signatures), "Invalid signatures provided");
 
-        success = paySubscription(to, value, data, operation, keccak256(subHashData), meta);
+        paySubscription(to, value, data, operation, keccak256(subHashData), meta);
         // If no safeTxGas has been set and the gasPrice is 0 we assume that all available gas can be used
-
-        if (!success) {
-            emit PaymentFailed(keccak256(subHashData));
-        }
 
         // We transfer the calculated tx costs to the refundReceiver to avoid sending it to intermediate contracts that have made calls
         if (gasPrice > 0) {
@@ -201,9 +196,9 @@ contract SubscriptionModule is Module, SignatureDecoder {
     /// @return bool isValid returns the validity of the subscription
     function isValidSubscription(
         bytes32 subscriptionHash,
-        bytes calldata signatures
+        bytes memory signatures
     )
-        external
+        public
         view
         returns (bool isValid)
     {
@@ -224,21 +219,21 @@ contract SubscriptionModule is Module, SignatureDecoder {
     function cancelSubscription(
         address to,
         uint256 value,
-        bytes calldata data,
+        bytes memory data,
         Enum.Operation operation,
         uint256 safeTxGas,
         uint256 dataGas,
         uint256 gasPrice,
         address gasToken,
         address refundAddress,
-        bytes calldata meta,
-        bytes calldata signatures
+        bytes memory meta,
+        bytes memory signatures
     )
-        external
+        public
         returns (bool)
     {
         bytes memory subHashData = encodeSubscriptionData(
-            to, value, data, operation, // Transaction info
+            to, value, data, operation,
             safeTxGas, dataGas, gasPrice, gasToken, refundAddress,
             meta
         );
@@ -308,7 +303,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
         uint256 offChainID,
         uint256 expires
     )
-        external
+        public
         pure
         returns (bytes memory)
     {
@@ -352,8 +347,6 @@ contract SubscriptionModule is Module, SignatureDecoder {
     /// @param data Data payload.
     /// @param operation Operation type.
     /// @param safeTxGas Fas that should be used for the safe transaction.
-    /// @param dataGas Gas costs for data used to trigger the safe transaction.
-    /// @param gasPrice Maximum gas price that should be used for this transaction.
     /// @param gasToken Token address (or 0 if ETH) that is used for the payment.
     /// @param meta bytes packed data(refund address, period, offChainID, expires
     /// @return Subscription hash bytes.
@@ -389,15 +382,16 @@ contract SubscriptionModule is Module, SignatureDecoder {
     /// @param value Ether value of Safe transaction.
     /// @param data Data payload of Safe transaction.
     /// @param operation Operation type of Safe transaction.
+    /// @param meta meta data of subscription agreement
     /// @return Estimate without refunds and overhead fees (base transaction and payload data gas costs).
     function requiredTxGas(
         address to,
         uint256 value,
-        bytes calldata data,
+        bytes memory data,
         Enum.Operation operation,
-        bytes calldata meta
+        bytes memory meta
     )
-        external
+        public
         authorized
         returns (uint256)
     {
