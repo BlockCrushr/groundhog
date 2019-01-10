@@ -1,29 +1,65 @@
-pragma solidity ^0.5.0;
-import "../common/SecuredTokenTransfer.sol";
-import "./DelegateConstructorProxy.sol";
+pragma solidity 0.5.0;
 
+import "../common/SecuredTokenTransfer.sol";
 /// @title Paying Proxy - Generic proxy contract allows to execute all transactions applying the code of a master contract. It is possible to send along initialization data with the constructor. And sends funds after creation to a specified account.
 /// @author Stefan George - <stefan@gnosis.pm>
 /// @author Richard Meissner - <richard@gnosis.pm>
-contract PayingProxy is DelegateConstructorProxy, SecuredTokenTransfer {
+/// @author Andrew Redden - <andrew@groundhog.network> - removed delegate proxy as its being populated with a setup function now.
+contract PayingProxy is SecuredTokenTransfer {
 
-    /// @dev Constructor function sets address of master copy contract.
-    /// @param _masterCopy Master copy address.
-    /// @param initializer Data used for a delegate call to initialize the contract.
-    /// @param funder Address that should be paid for the execution of this call
-    /// @param paymentToken Token that should be used for the payment (0 is ETH)
-    /// @param payment Value that should be paid
-    constructor(address _masterCopy, bytes memory initializer, address payable funder, address paymentToken, uint256 payment) 
-        DelegateConstructorProxy(_masterCopy, initializer)
-        public
+    // masterCopy always needs to be first declared variable, to ensure that it is at the same location in the contracts to which calls are delegated.
+    address masterCopy;
+
+    function setup(
+        address _masterCopy,
+        address payable funder,
+        address paymentToken,
+        uint256 payment
+    )
+    external
     {
+        require(_masterCopy != address(0), "Invalid master copy address provided");
+        masterCopy = _masterCopy;
+
         if (payment > 0) {
             if (paymentToken == address(0)) {
-                 // solium-disable-next-line security/no-send
+                // solium-disable-next-line security/no-send
                 require(funder.send(payment), "Could not pay safe creation with ether");
             } else {
                 require(transferToken(paymentToken, funder, payment), "Could not pay safe creation with token");
             }
-        } 
+        }
+    }
+
+    /// @dev Fallback function forwards all transactions and returns all received return data.
+    function()
+    external
+    payable
+    {
+        // solium-disable-next-line security/no-inline-assembly
+        assembly {
+            let masterCopy := and(sload(0), 0xffffffffffffffffffffffffffffffffffffffff)
+            calldatacopy(0, 0, calldatasize())
+            let success := delegatecall(gas, masterCopy, 0, calldatasize(), 0, 0)
+            returndatacopy(0, 0, returndatasize())
+            if eq(success, 0) {revert(0, returndatasize())}
+            return (0, returndatasize())
+        }
+    }
+
+    function implementation()
+    public
+    view
+    returns (address)
+    {
+        return masterCopy;
+    }
+
+    function proxyType()
+    public
+    pure
+    returns (uint256)
+    {
+        return 3;
     }
 }
