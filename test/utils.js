@@ -18,7 +18,7 @@ const ModuleDataWrapper = new web3.eth.Contract([
         "type": "function"
     }
 ]);
-   
+
 function createAndAddModulesData(dataArray) {
     // Remove method id (10) and position of data in payload (64)
     let mw = ModuleDataWrapper
@@ -27,22 +27,26 @@ function createAndAddModulesData(dataArray) {
 }
 
 function currentTimeNs() {
-    const hrTime=process.hrtime();
+    const hrTime = process.hrtime();
     return hrTime[0] * 1000000000 + hrTime[1]
 }
 
 function dataGasValue(hexValue) {
-   switch(hexValue) {
-    case "0x": return 0
-    case "00": return 4
-    default: return 68
-  };
+    switch (hexValue) {
+        case "0x":
+            return 0
+        case "00":
+            return 4
+        default:
+            return 68
+    }
+    ;
 }
 
 function estimateDataGasCosts(dataString) {
-  const reducer = (accumulator, currentValue) => accumulator += dataGasValue(currentValue)
+    const reducer = (accumulator, currentValue) => accumulator += dataGasValue(currentValue)
 
-  return dataString.match(/.{2}/g).reduce(reducer, 0)
+    return dataString.match(/.{2}/g).reduce(reducer, 0)
 }
 
 function getParamFromTxEventWithAdditionalDefinitions(definitions, transaction, eventName, paramName, contract, contractFactory, subject) {
@@ -50,19 +54,31 @@ function getParamFromTxEventWithAdditionalDefinitions(definitions, transaction, 
     return getParamFromTxEvent(transaction, eventName, paramName, contract, contractFactory, subject)
 }
 
-function getParamFromTxEvent(transaction, eventName, paramName, contract, contractFactory, subject) {
+async function getParamFromTxEvent(transaction, eventName, paramName, contract, contractFactory, subject, getContractInstance) {
     assert.isObject(transaction)
     if (subject != null) {
         logGasUsage(subject, transaction)
     }
-    let logs = transaction.logs
-    if(eventName != null) {
-        logs = logs.filter((l) => l.event === eventName && l.address === contract)
+    let logs;
+
+    let events = transaction.events[eventName];
+    let param;
+    if (typeof events === "object") {
+        if (eventName != null && events.address === contract) {
+            const rv = events.returnValues;
+            logs = Object.keys(rv).filter((k, v) => {
+                if (k === paramName) {
+                    return rv[k];
+                }
+            })
+        }
+        param = events.returnValues[paramName]
     }
-    assert.equal(logs.length, 1, 'too many logs found!')
-    let param = logs[0].args[paramName]
-    if(contractFactory != null) {
-        let contract = contractFactory.at(param)
+
+    // assert.equal(logs.length, 1, 'too many logs found!')
+
+    if (contractFactory != null) {
+        let contract = await getContractInstance(contractFactory, {deployedAddress: param})
         assert.isObject(contract, `getting ${paramName} failed for ${param}`)
         return contract
     } else {
@@ -71,16 +87,16 @@ function getParamFromTxEvent(transaction, eventName, paramName, contract, contra
 }
 
 function checkTxEvent(transaction, eventName, contract, exists, subject) {
-  assert.isObject(transaction)
-  if (subject && subject != null) {
-      logGasUsage(subject, transaction)
-  }
-  let logs = transaction.logs
-  if(eventName != null) {
-      logs = logs.filter((l) => l.event === eventName && l.address === contract)
-  }
-  assert.equal(logs.length, exists ? 1 : 0, exists ? 'event was not present' : 'event should not be present')
-  return exists ? logs[0] : null
+    assert.isObject(transaction)
+    if (subject && subject != null) {
+        logGasUsage(subject, transaction)
+    }
+    let logs = transaction.logs
+    if (eventName != null) {
+        logs = logs.filter((l) => l.event === eventName && l.address === contract)
+    }
+    assert.equal(logs.length, exists ? 1 : 0, exists ? 'event was not present' : 'event should not be present')
+    return exists ? logs[0] : null
 }
 
 function logGasUsage(subject, transactionOrReceipt) {
@@ -109,7 +125,7 @@ async function createLightwallet() {
 function signTransaction(lw, signers, transactionHash) {
     let signatureBytes = "0x"
     signers.sort()
-    for (var i=0; i<signers.length; i++) {
+    for (var i = 0; i < signers.length; i++) {
         let sig = lightwallet.signing.signMsgHash(lw.keystore, lw.passwords, transactionHash, signers[i])
         signatureBytes += sig.r.toString('hex') + sig.s.toString('hex') + sig.v.toString(16)
     }
@@ -120,10 +136,10 @@ async function assertRejects(q, msg) {
     let res, catchFlag = false
     try {
         res = await q
-    } catch(e) {
+    } catch (e) {
         catchFlag = true
     } finally {
-        if(!catchFlag)
+        if (!catchFlag)
             assert.fail(res, null, msg)
     }
     return res
@@ -140,9 +156,9 @@ async function compile(source) {
         'language': 'Solidity',
         'settings': {
             'outputSelection': {
-            '*': {
-                '*': [ 'abi', 'evm.bytecode' ]
-            }
+                '*': {
+                    '*': ['abi', 'evm.bytecode']
+                }
             }
         },
         'sources': {

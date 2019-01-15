@@ -45,7 +45,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
     {
         setManager();
         require(domainSeparator == 0, "Domain Separator already set!");
-        domainSeparator = keccak256(abi.encode(DOMAIN_SEPARATOR_TYPEHASH, this, NAME, VERSION));
+        domainSeparator = keccak256(abi.encode(DOMAIN_SEPARATOR_TYPEHASH, this));
     }
 
     /// @dev Allows to execute a Safe transaction confirmed by required number of owners and then pays the account that submitted the transaction.
