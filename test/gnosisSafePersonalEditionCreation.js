@@ -13,7 +13,7 @@
 //
 //     const CALL = 0
 //
-//     const gasPrice = web3.toWei('20', 'gwei')
+//     const gasPrice = web3.utils.toWei('20', 'gwei')
 //     const payingProxyJson = JSON.parse(fs.readFileSync("./build/contracts/PayingProxy.json"))
 //     const PayingProxy = web3.eth.contract(payingProxyJson.abi)
 //

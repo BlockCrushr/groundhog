@@ -7,14 +7,20 @@ const CreateAndAddModules = artifacts.require("./libraries/CreateAndAddModules.s
 const GnosisSafe = artifacts.require("./GnosisSafe.sol")
 const SubscriptionModule = artifacts.require("./modules/SubscriptionModule.sol")
 const ProxyFactory = artifacts.require("./ProxyFactory.sol")
-// const PayingProxy = artifacts.require("./PayingProxy.sol")
-const GAS_PRICE = web3.toWei(20, 'gwei')
+const ModuleDataWrapper = artifacts.require("./ModuleDataWrapper.sol")
+const PayingProxy = artifacts.require("./PayingProxy.sol")
+const Proxy = artifacts.require("./Proxy.sol")
 
 
+const { getWeb3, getContractInstance } = require("./helpers")
+// const web3 = getWeb3()
+const getInstance = getContractInstance(web3)
+
+const GAS_PRICE = web3.utils.toWei('20', 'gwei')
 
 contract('SubscriptionModule', function (accounts) {
-    const payingProxyJson = JSON.parse(fs.readFileSync("./build/contracts/PayingProxy.json"))
-    const PayingProxy = web3.eth.contract(payingProxyJson.abi)
+    // const payingProxyJson = JSON.parse(fs.readFileSync("./build/contracts/PayingProxy.json"))
+    // const PayingProxy = web3.eth.Contract(payingProxyJson.abi)
 
     let gnosisSafe;
     let subscriptionModule;
@@ -60,7 +66,7 @@ contract('SubscriptionModule', function (accounts) {
                 ]
             },
             domain: {
-                verifyingContract: subscriptionModule.address
+                verifyingContract: subscriptionModule.options.address
             },
             primaryType: "SafeSubTx",
             message: {
@@ -91,9 +97,9 @@ contract('SubscriptionModule', function (accounts) {
         // numbers < 65k are 256 -> 30 * 4 + 2 * 68
         // For signature array length and dataGasEstimate we already calculated the 0 bytes so we just add 64 for each non-zero byte
         let signatureCost = signatureCount * (68 + 2176 + 2176) // array count (3 -> r, s, v) * signature count
-        let payload = subscriptionModule.contract.execSubscription.getData(
+        let payload = subscriptionModule.contract.execSubscription(
             to, value, data, operation, txGasEstimate, 0, GAS_PRICE, gasToken, refundAddress, meta, "0x"
-        )
+        ).encodeABI();
         let dataGasEstimate = utils.estimateDataGasCosts(payload) + signatureCost
         if (dataGasEstimate > 65536) {
             dataGasEstimate += 64
@@ -115,8 +121,8 @@ contract('SubscriptionModule', function (accounts) {
         // let manager = await subscriptionModule.contract.manager();
         try {
             // let subhash = await subscriptionModule.contract.getSubscriptionHash(to, value, data, operation, txGasEstimate, dataGasEstimate, gasPrice, txGasToken, executor, meta);
-            let estimateData = subscriptionModule.contract.requiredTxGas.getData(to, value, data, operation, meta);
-            let estimateResponse = await web3.eth.call({to: subscriptionModule.address, from: gnosisSafe.address, data: estimateData})
+            let estimateData = subscriptionModule.contract.requiredTxGas(to, value, data, operation, meta).encodeABI();
+            let estimateResponse = await web3.eth.call({to: subscriptionModule.options.address, from: gnosisSafe.options.address, data: estimateData})
             txGasEstimate = new BigNumber(estimateResponse.substring(138), 16).toNumber()
             // Add 10k else we will fail in case of nested calls
             txGasEstimate = txGasEstimate + 90000
@@ -136,8 +142,8 @@ contract('SubscriptionModule', function (accounts) {
 
 
         let sigs = await signer(accounts, to, value, data, operation, txGasEstimate, dataGasEstimate, gasPrice, txGasToken, executor, meta);
-        // console.log(`groundhog: ${gnosisSafe.address}`);
-        // console.log(`groundhog: ${subscriptionModule.address}`);
+        // console.log(`groundhog: ${gnosisSafe.options.address}`);
+        // console.log(`groundhog: ${subscriptionModule.options.address}`);
         // console.log(`to: ${to}`);
         // console.log(`value: ${value}`);
         // console.log(`data: ${data}`);
@@ -150,7 +156,7 @@ contract('SubscriptionModule', function (accounts) {
         // console.log(`meta: ${meta}`);
         // console.log(`Sigs: ${sigs}`)
 
-        let safeBalanceBefore = await web3.eth.getBalance(gnosisSafe.address).toNumber();
+        let safeBalanceBefore = await web3.eth.getBalance(gnosisSafe.options.address).toNumber();
         console.log(`    Balance Before: ${safeBalanceBefore}`)
 
         // Execute paying transaction
@@ -159,7 +165,7 @@ contract('SubscriptionModule', function (accounts) {
             to, value, data, operation, txGasEstimate, dataGasEstimate, gasPrice, txGasToken, executor, meta, sigs, {from: executor, gas:8000000}
         );
 
-        // let events = utils.checkTxEvent(tx, 'PaymentFailed', subscriptionModule.address, txFailed, subject)
+        // let events = utils.checkTxEvent(tx, 'PaymentFailed', subscriptionModule.options.address, txFailed, subject)
         // if (txFailed) {
         //     let subHash = await subscriptionModule.getSubscriptionHash(accounts, to, value, data, operation, txGasEstimate, dataGasEstimate, gasPrice, txGasToken, executor, meta)
         //     assert.equal(subHash, events.args.subHash)
@@ -173,44 +179,63 @@ contract('SubscriptionModule', function (accounts) {
         // Create libraries
         // Create Master Copies
 
+        // let createAndAddModules = getInstance("CreateAndAddModules");
+        // let proxyFactory = getInstance("ProxyFactory");
+        // let gnosisSafeMasterCopy = getInstance("GnosisSafe");
+        // let subscriptionModuleMasterCopy = getInstance("SubscriptionModule");
+        // let mdw = getInstance("ModuleDataWrapper");
+        // let mdw = await ModuleDataWrapper.new()
+        //setup master copies
         let createAndAddModules = await CreateAndAddModules.new()
-        let proxyFactory = await ProxyFactory.new()
+        let proxyFactory = await ProxyFactory.new(Proxy.bytecode)
         let gnosisSafeMasterCopy = await GnosisSafe.new()
-        let groundhogModuleMasterCopy = await SubscriptionModule.new()
-        // //setup master copies
+        let subscriptionModuleMasterCopy = await SubscriptionModule.new()
         gnosisSafeMasterCopy.setup([accounts[0], accounts[1], accounts[2]], 2, 0, "0x")
-        groundhogModuleMasterCopy.setup()
-        // let proxyFactory = ProxyFactory.at('0xf81e35398b5d09d891db0199064ff4a53e7ecae6')
-        // let gnosisSafeMasterCopy = GnosisSafe.at('0x2727d69c0bd14b1ddd28371b8d97e808adc1c2f7')
-        // let groundhogModuleMasterCopy = SubscriptionModule.at('0x1cac1bb808b1619b2ae0903179e39ac7b5169914')
-        // let createAndAddModules = CreateAndAddModules.at('0x5096cd7f7f5F2e621A480c1aE8969c03CB647a91')
+        subscriptionModuleMasterCopy.setup()
+        // proxyFactory.setup(Proxy)
+        // let proxyFactory = ProxyFactory.at('0xc48c777a072f3e0e4429f2d419379e60daed4924')
+        // let gnosisSafeMasterCopy = GnosisSafe.at('0x155be870022842b7C3B9097eCEd5a7a92003a149')
+        // let subscriptionModuleMasterCopy = SubscriptionModule.at('0x0755ac5de64e0819a4e2c10fce281dc82cee3e7d')
+        // let createAndAddModules = CreateAndAddModules.at('0x8f5071ee235f4ddd972491b6ceaeeba5e4263202')
 
         // Subscription module setup
-        let groundhogSetupData = await groundhogModuleMasterCopy.contract.setup.getData()
-        let groundhogCreationData = await proxyFactory.contract.createProxy.getData(groundhogModuleMasterCopy.address, groundhogSetupData)
+        let subscriptionModuleSetupData = await subscriptionModuleMasterCopy.contract.setup.getData();
+        let subscriptionModuleCreationData = await proxyFactory.contract.createProxy.getData(subscriptionModuleMasterCopy.options.address, subscriptionModuleSetupData);
 
-        let modulesCreationData = utils.createAndAddModulesData([groundhogCreationData])
-
+        // let modulesCreationData = utils.createAndAddModulesData([subscriptionModuleCreationData])
+        let modulesCreationData = [subscriptionModuleCreationData].reduce((acc, data) => acc + mdw.contract.setup.getData(data).substr(74), "0x")
         //called as apart of the setup, currently doesn't work when initialized through the constructor paying proxy workflow
-        let createAndAddModulesData = createAndAddModules.contract.createAndAddModules.getData(proxyFactory.address, modulesCreationData )
+        let createAndAddModulesData = createAndAddModules.contract.createAndAddModules.getData(proxyFactory.options.address, modulesCreationData )
         // Create Gnosis Safe
-        let gnosisSafeData = await gnosisSafeMasterCopy.contract.setup.getData([accounts[0], accounts[1], accounts[2]], 1, createAndAddModules.address, createAndAddModulesData)
+        let gnosisSafeData = await gnosisSafeMasterCopy.contract.setup.getData([accounts[0], accounts[1], accounts[2]], 1, createAndAddModules.options.address, createAndAddModulesData);
 
-        gnosisSafe = utils.getParamFromTxEvent(
-            await proxyFactory.createProxy(gnosisSafeMasterCopy.address, gnosisSafeData),
-            'ProxyCreation', 'proxy', proxyFactory.address, GnosisSafe, 'create Gnosis Safe',
+        // gnosisSafe = utils.getParamFromTxEvent(
+        //     await proxyFactory.contract.createProxy(
+        //         gnosisSafeMasterCopy.options.address,
+        //         gnosisSafeData,
+        //     ),
+        //     'ProxyCreation', 'proxy', proxyFactory.options.address, GnosisSafe, 'create Gnosis Safe',
+        // )
+
+        gnosisSafe = await proxyFactory.createPayingProxy(
+            54,
+            gnosisSafeMasterCopy.options.address,
+            gnosisSafeData,
+            gnosisSafeMasterCopy.options.address,
+            gnosisSafeMasterCopy.options.address,
+            0
         )
 
-        let modules = await gnosisSafe.getModules()
-        subscriptionModule = SubscriptionModule.at(modules[0])
-        assert.equal(await subscriptionModule.manager.call(), gnosisSafe.address)
+        let modules = await gnosisSafe.contract.getModules()
+        subscriptionModule = new SubscriptionModule(modules[0]);
+        assert.equal(await subscriptionModule.manager.call(), gnosisSafe.options.address)
     })
 
     it('should deposit 1.1 ETH and pay a daily 0.5 ETH subscription on two different days', async () => {
         // Deposit 1 ETH + some spare money for execution
-        assert.equal(await web3.eth.getBalance(gnosisSafe.address), 0)
-        await web3.eth.sendTransaction({from: receiver, to: gnosisSafe.address, value: web3.toWei(1.1, 'ether')})
-        assert.equal(await web3.eth.getBalance(gnosisSafe.address).toNumber(), web3.toWei(1.1, 'ether'))
+        assert.equal(await web3.eth.getBalance(gnosisSafe.options.address), 0)
+        await web3.eth.sendTransaction({from: receiver, to: gnosisSafe.options.address, value: web3.utils.toWei('1.1', 'ether')})
+        assert.equal(await web3.eth.getBalance(gnosisSafe.options.address).toNumber(), web3.utils.toWei('1.1', 'ether'))
 
         let executorBalance = await web3.eth.getBalance(executor).toNumber()
         let recieverBalance = await web3.eth.getBalance(receiver).toNumber()
@@ -218,12 +243,12 @@ contract('SubscriptionModule', function (accounts) {
 
 
         // Withdraw 0.5 ETH
-        let tx = await executeSubscriptionWithSigner(signer, 'executeSubscription withdraw 0.5 ETH', confirmingAccounts, receiver, web3.toWei(0.5, 'ether'), "0x", CALL, executor, {meta: await subscriptionModule.contract.getSubscriptionMetaBytes(1, 1, 0)})
+        let tx = await executeSubscriptionWithSigner(signer, 'executeSubscription withdraw 0.5 ETH', confirmingAccounts, receiver, web3.utils.toWei('0.5', 'ether'), "0x", CALL, executor, {meta: await subscriptionModule.contract.getSubscriptionMetaBytes(1, 1, 0)})
 
 
         console.log(`    Paying Daily Subscription Tx 0.5 ETH: ${tx}`);
 
-        let safeBalanceAfter = await web3.eth.getBalance(gnosisSafe.address).toNumber();
+        let safeBalanceAfter = await web3.eth.getBalance(gnosisSafe.options.address).toNumber();
         console.log(`    Balance After: ${safeBalanceAfter}`);
         let executorDiff = await web3.eth.getBalance(executor) - executorBalance
         executorBalance = await web3.eth.getBalance(executor);
@@ -232,57 +257,57 @@ contract('SubscriptionModule', function (accounts) {
         console.log(`    Advancing Time 86400 seconds (1 Day)`);
         await timeHelper.advanceTimeAndBlock(86400);
 
-        let tx2 = await executeSubscriptionWithSigner(signer, 'executeSubscription withdraw 0.5 ETH', confirmingAccounts, receiver, web3.toWei(0.5, 'ether'), "0x", CALL, executor, {meta: await subscriptionModule.contract.getSubscriptionMetaBytes(1, 1, 0)})
+        let tx2 = await executeSubscriptionWithSigner(signer, 'executeSubscription withdraw 0.5 ETH', confirmingAccounts, receiver, web3.utils.toWei('0.5', 'ether'), "0x", CALL, executor, {meta: await subscriptionModule.contract.getSubscriptionMetaBytes(1, 1, 0)})
 
         console.log(`    Paying Daily Subscription Tx 0.5 ETH: ${tx2}`);
-        safeBalanceAfter = await web3.eth.getBalance(gnosisSafe.address).toNumber();
+        safeBalanceAfter = await web3.eth.getBalance(gnosisSafe.options.address).toNumber();
         console.log(`    After: ${safeBalanceAfter}`);
         executorDiff = await web3.eth.getBalance(executor) - executorBalance;
 
         let receiverDiff = await web3.eth.getBalance(receiver) - recieverBalance
         console.log("    Executor earned " + web3.fromWei(executorDiff, 'ether') + " ETH");
 
-        assert.equal(receiverDiff, web3.toWei(1, 'ether'))
+        assert.equal(receiverDiff, web3.utils.toWei('1', 'ether'))
     });
 
-    it('should deposit 1.1 ETH attempt to pay the same 0.5 subscription twice in the same day', async () => {
-        // Deposit 1 ETH + some spare money for execution
-        assert.equal(await web3.eth.getBalance(gnosisSafe.address), 0)
-        await web3.eth.sendTransaction({from: receiver, to: gnosisSafe.address, value: web3.toWei(1.1, 'ether')})
-        assert.equal(await web3.eth.getBalance(gnosisSafe.address).toNumber(), web3.toWei(1.1, 'ether'))
-
-        let executorBalance = await web3.eth.getBalance(executor).toNumber()
-        let recieverBalance = await web3.eth.getBalance(receiver).toNumber()
-        let confirmingAccounts = [accounts[0], accounts[2]]
-
-
-        // Withdraw 0.5 ETH
-        let tx = await executeSubscriptionWithSigner(signer, 'executeSubscription withdraw 0.5 ETH', confirmingAccounts, receiver, web3.toWei(0.5, 'ether'), "0x", CALL, executor, {meta: await subscriptionModule.contract.getSubscriptionMetaBytes(1, 1, 0)})
-
-
-        console.log(`    Paying Daily Subscription Tx 0.5 ETH: ${tx}`);
-
-        let safeBalanceAfter = await web3.eth.getBalance(gnosisSafe.address).toNumber();
-        console.log(`    Balance After: ${safeBalanceAfter}`);
-
-        console.log(`    Requesting Another Payment Immediately`);
-
-        await utils.assertRejects(
-            executeSubscriptionWithSigner(signer, 'executeSubscription withdraw 0.5 ETH', confirmingAccounts, receiver, web3.toWei(0.5, 'ether'), "0x", CALL, executor, {fails: true, meta: await subscriptionModule.contract.getSubscriptionMetaBytes(1, 1, 0)}),
-            "Withdraw Cooldown"
-        )
-
-
-        // console.log(`    Paying Daily Subscription Tx 0.5 ETH: ${tx2}`);
-        safeBalanceAfter = await web3.eth.getBalance(gnosisSafe.address).toNumber();
-        console.log(`    After: ${safeBalanceAfter}`);
-        let executorDiff = await web3.eth.getBalance(executor) - executorBalance
-        let receiverDiff = await web3.eth.getBalance(receiver) - recieverBalance
-
-        console.log("    Executor earned " + web3.fromWei(executorDiff, 'ether') + " ETH");
-
-        assert.equal(receiverDiff, web3.toWei(0.5, 'ether'));
-
-    });
+    // it('should deposit 1.1 ETH attempt to pay the same 0.5 subscription twice in the same day', async () => {
+    //     // Deposit 1 ETH + some spare money for execution
+    //     assert.equal(await web3.eth.getBalance(gnosisSafe.options.address), 0)
+    //     await web3.eth.sendTransaction({from: receiver, to: gnosisSafe.options.address, value: web3.utils.toWei('1.1', 'ether')})
+    //     assert.equal(await web3.eth.getBalance(gnosisSafe.options.address).toNumber(), web3.utils.toWei('1.1', 'ether'))
+    //
+    //     let executorBalance = await web3.eth.getBalance(executor).toNumber()
+    //     let recieverBalance = await web3.eth.getBalance(receiver).toNumber()
+    //     let confirmingAccounts = [accounts[0], accounts[2]]
+    //
+    //
+    //     // Withdraw 0.5 ETH
+    //     let tx = await executeSubscriptionWithSigner(signer, 'executeSubscription withdraw 0.5 ETH', confirmingAccounts, receiver, web3.utils.toWei('0.5', 'ether'), "0x", CALL, executor, {meta: await subscriptionModule.contract.getSubscriptionMetaBytes(1, 1, 0)})
+    //
+    //
+    //     console.log(`    Paying Daily Subscription Tx 0.5 ETH: ${tx}`);
+    //
+    //     let safeBalanceAfter = await web3.eth.getBalance(gnosisSafe.options.address).toNumber();
+    //     console.log(`    Balance After: ${safeBalanceAfter}`);
+    //
+    //     console.log(`    Requesting Another Payment Immediately`);
+    //
+    //     await utils.assertRejects(
+    //         executeSubscriptionWithSigner(signer, 'executeSubscription withdraw 0.5 ETH', confirmingAccounts, receiver, web3.utils.toWei('0.5', 'ether'), "0x", CALL, executor, {fails: true, meta: await subscriptionModule.contract.getSubscriptionMetaBytes(1, 1, 0)}),
+    //         "Withdraw Cooldown"
+    //     )
+    //
+    //
+    //     // console.log(`    Paying Daily Subscription Tx 0.5 ETH: ${tx2}`);
+    //     safeBalanceAfter = await web3.eth.getBalance(gnosisSafe.options.address).toNumber();
+    //     console.log(`    After: ${safeBalanceAfter}`);
+    //     let executorDiff = await web3.eth.getBalance(executor) - executorBalance
+    //     let receiverDiff = await web3.eth.getBalance(receiver) - recieverBalance
+    //
+    //     console.log("    Executor earned " + web3.fromWei(executorDiff, 'ether') + " ETH");
+    //
+    //     assert.equal(receiverDiff, web3.utils.toWei('0.5', 'ether'));
+    //
+    // });
 })
 

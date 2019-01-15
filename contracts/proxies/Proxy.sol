@@ -11,7 +11,7 @@ contract Proxy {
     /// @dev Constructor function sets address of master copy contract.
     /// @param _masterCopy Master copy address.
     constructor(address _masterCopy)
-        public
+    public
     {
         require(_masterCopy != address(0), "Invalid master copy address provided");
         masterCopy = _masterCopy;
@@ -34,17 +34,17 @@ contract Proxy {
     }
 
     function implementation()
-        public
-        view
-        returns (address)
+    public
+    view
+    returns (address)
     {
         return masterCopy;
     }
 
     function proxyType()
-        public
-        pure
-        returns (uint256)
+    public
+    pure
+    returns (uint256)
     {
         return 2;
     }

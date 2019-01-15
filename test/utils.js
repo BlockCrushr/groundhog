@@ -2,12 +2,28 @@ const util = require('util');
 const solc = require('solc')
 const lightwallet = require('eth-lightwallet')
 const abi = require("ethereumjs-abi");
-const ModuleDataWrapper = web3.eth.contract([{"constant":false,"inputs":[{"name":"data","type":"bytes"}],"name":"setup","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"}]);
+const ModuleDataWrapper = new web3.eth.Contract([
+    {
+        "constant": false,
+        "inputs": [
+            {
+                "name": "data",
+                "type": "bytes"
+            }
+        ],
+        "name": "setup",
+        "outputs": [],
+        "payable": false,
+        "stateMutability": "nonpayable",
+        "type": "function"
+    }
+]);
    
 function createAndAddModulesData(dataArray) {
-    let mw = ModuleDataWrapper.at(1)
     // Remove method id (10) and position of data in payload (64)
-    return dataArray.reduce((acc, data) => acc + mw.setup.getData(data).substr(74), "0x")
+    let mw = ModuleDataWrapper
+    mw.options.address = "0x155be870022842b7C3B9097eCEd5a7a92003a149"
+    return dataArray.reduce((acc, data) => acc + mw.methods.setup(data).encodeABI().substr(74), "0x")
 }
 
 function currentTimeNs() {

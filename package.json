@@ -11,8 +11,10 @@
     "zos.*.json"
   ],
   "scripts": {
-    "test-norpc": "truffle test",
-    "test": "run-with-testrpc -l 20000000 --noVMErrorsOnRPCResponse true 'truffle test'"
+    "test-norpc": "node $NODE_DEBUG_OPTION ./node_modules/.bin/truffle test",
+    "test": "run-with-testrpc -l 20000000 --noVMErrorsOnRPCResponse true 'truffle test'",
+    "deploy-rinkeby": "node $NODE_DEBUG_OPTION ./node_modules/.bin/truffle migrate --reset --network rinkeby",
+    "console-rinkeby": "node $NODE_DEBUG_OPTION ./node_modules/.bin/truffle console --network rinkeby"
   },
   "repository": {
     "type": "git",
@@ -31,19 +33,19 @@
     "@digix/tempo": "^0.2.0",
     "@gnosis.pm/mock-contract": "github:gnosis/mock-contract#sol_0_5_0",
     "bignumber.js": "github:frozeman/bignumber.js-nolookahead",
-    "eth-lightwallet": "3.0.0",
+    "eth-lightwallet": "^3.0.1",
     "ethereumjs-abi": "^0.6.5",
-    "ganache-cli": "6.1.7",
     "random-buffer": "*",
     "run-with-testrpc": "^0.3.0",
     "solidity-coverage": "^0.4.2",
-    "truffle": "^4.1.14",
     "web3": "0.20.6"
   },
   "dependencies": {
     "bitcore-mnemonic": "^1.5.0",
     "openzeppelin-solidity": "^2.0.0",
     "solc": "^0.5.0",
-    "truffle-hdwallet-provider": "0.0.7-beta.1"
+    "truffle": "^5.0.1",
+    "truffle-hdwallet-provider": "0.0.7-beta.1",
+    "webpack": "^4.28.4"
   }
 }

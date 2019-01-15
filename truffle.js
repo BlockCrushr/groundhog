@@ -12,10 +12,10 @@ module.exports = {
     },
     rinkeby: {
       provider: () => {
-        return new HDWalletProvider(mnemonic, 'https://rinkeby.infura.io/' + token)
+        return new HDWalletProvider(mnemonic, 'https://rinkeby.infura.io/v3/' + token)
       },
       network_id: '4',
-      gasPrice: 25000000000, // 25 Gwei
+      gasPrice: 100000000000, // 25 Gwei
     },
     kovan: {
       provider: () => {
@@ -32,9 +32,14 @@ module.exports = {
       gasPrice: 25000000000, // 25 Gwei
     }
   },
-  solc: {
-    optimizer: {
-      enabled: false
+  compilers: {
+    solc: {
+      settings: {
+        optimizer: {
+          enabled: true,
+          runs: 200
+        },
+      },
     },
   },
 };

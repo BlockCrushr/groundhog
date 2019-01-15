@@ -2,7 +2,7 @@ const utils = require('./utils')
 const solc = require('solc')
 const BigNumber = require('bignumber.js');
 
-const GAS_PRICE = web3.toWei(100, 'gwei')
+const GAS_PRICE = web3.utils.toWei('100', 'gwei')
 
 let estimateDataGas = function(safe, to, value, data, operation, txGasEstimate, gasToken, refundReceiver, signatureCount) {
     // numbers < 256 are 192 -> 31 * 4 + 68
