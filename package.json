@@ -42,7 +42,7 @@
   },
   "dependencies": {
     "bitcore-mnemonic": "^1.5.0",
-    "openzeppelin-solidity": "^2.0.0",
+    "openzeppelin-solidity": "^2.1.2",
     "solc": "^0.5.0",
     "truffle": "^5.0.1",
     "truffle-hdwallet-provider": "0.0.7-beta.1",

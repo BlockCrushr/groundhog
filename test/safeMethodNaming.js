@@ -3,7 +3,7 @@
 //
 // const GnosisSafePersonal = artifacts.require("./GnosisSafe.sol");
 //
-// contract('GnosisSafeEditions', function(accounts) {
+// contract('GnosisSafeEditions', function(oracles) {
 //
 //     let getSortedFunctions = function(abi) {
 //         return abi.filter((e) => e.type === 'function')

@@ -9,7 +9,7 @@
 // const TransactionWrapper = web3.eth.contract([{"constant":false,"inputs":[{"name":"operation","type":"uint8"},{"name":"to","type":"address"},{"name":"value","type":"uint256"},{"name":"data","type":"bytes"}],"name":"send","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"}]);
 //
 //
-// contract('MultiSend', function(accounts) {
+// contract('MultiSend', function(oracles) {
 //
 //     let gnosisSafe
 //     let multiSend
@@ -25,7 +25,7 @@
 //         // Create Gnosis Safe and MultiSend library
 //         lw = await utils.createLightwallet()
 //         gnosisSafe = await GnosisSafe.new()
-//         await gnosisSafe.setup([lw.accounts[0], lw.accounts[1]], 1, 0, 0)
+//         await gnosisSafe.setup([lw.oracles[0], lw.oracles[1]], 1, 0, 0)
 //         multiSend = await MultiSend.new()
 //         createAndAddModules = await CreateAndAddModules.new()
 //
@@ -40,7 +40,7 @@
 //         assert.deepEqual(await gnosisSafe.getModules(), [])
 //         // Deposit 1 ETH
 //         assert.equal(await web3.eth.getBalance(gnosisSafe.address), 0)
-//         await web3.eth.sendTransaction({from: accounts[0], to: gnosisSafe.address, value: web3.toWei(2, 'ether')})
+//         await web3.eth.sendTransaction({from: oracles[0], to: gnosisSafe.address, value: web3.toWei(2, 'ether')})
 //         assert.equal(await web3.eth.getBalance(gnosisSafe.address).toNumber(), web3.toWei(2, 'ether'))
 //         // Withdraw 2 ETH and change threshold
 //         let nonce = await gnosisSafe.nonce()
@@ -57,13 +57,13 @@
 //         let nestedTransactionData = '0x' +
 //             tw.send.getData(0, gnosisSafe.address, 0, '0x' + '0'.repeat(64)).substr(10) +
 //             tw.send.getData(0, gnosisSafe.address, 0, changeData).substr(10) +
-//             tw.send.getData(0, accounts[0], web3.toWei(0.5, 'ether'), '0x').substr(10) +
+//             tw.send.getData(0, oracles[0], web3.toWei(0.5, 'ether'), '0x').substr(10) +
 //             tw.send.getData(1, createAndAddModules.address, 0, createAndAddModulesData).substr(10) +
-//             tw.send.getData(0, accounts[1], web3.toWei(0.5, 'ether'), '0x').substr(10) +
-//             tw.send.getData(0, accounts[2], web3.toWei(1, 'ether'), '0x').substr(10)
+//             tw.send.getData(0, oracles[1], web3.toWei(0.5, 'ether'), '0x').substr(10) +
+//             tw.send.getData(0, oracles[2], web3.toWei(1, 'ether'), '0x').substr(10)
 //         let data = await multiSend.contract.multiSend.getData(nestedTransactionData)
 //         let transactionHash = await gnosisSafe.getTransactionHash(multiSend.address, 0, data, DELEGATECALL, 0, 0, 0, 0, 0, nonce)
-//         let sigs = utils.signTransaction(lw, [lw.accounts[0]], transactionHash)
+//         let sigs = utils.signTransaction(lw, [lw.oracles[0]], transactionHash)
 //         utils.logGasUsage(
 //             'execTransaction send multiple transactions',
 //             await gnosisSafe.execTransaction(
@@ -86,7 +86,7 @@
 //
 //         let data = await multiSend.contract.multiSend.getData(nestedTransactionData)
 //         let transactionHash = await gnosisSafe.getTransactionHash(multiSend.address, 0, data, DELEGATECALL, 0, 0, 0, 0, 0, nonce)
-//         let sigs = utils.signTransaction(lw, [lw.accounts[0]], transactionHash)
+//         let sigs = utils.signTransaction(lw, [lw.oracles[0]], transactionHash)
 //         utils.checkTxEvent(
 //             await gnosisSafe.execTransaction(
 //                 multiSend.address, 0, data, DELEGATECALL, 0, 0, 0, 0, 0, sigs
@@ -110,7 +110,7 @@
 //
 //         let data = await multiSend.contract.multiSend.getData(nestedTransactionData)
 //         let transactionHash = await gnosisSafe.getTransactionHash(multiSend.address, 0, data, DELEGATECALL, 0, 0, 0, 0, 0, nonce)
-//         let sigs = utils.signTransaction(lw, [lw.accounts[0]], transactionHash)
+//         let sigs = utils.signTransaction(lw, [lw.oracles[0]], transactionHash)
 //         utils.checkTxEvent(
 //             await gnosisSafe.execTransaction(
 //                 multiSend.address, 0, data, DELEGATECALL, 0, 0, 0, 0, 0, sigs

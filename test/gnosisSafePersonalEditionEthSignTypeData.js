@@ -6,10 +6,10 @@
 // const ProxyFactory = artifacts.require("./ProxyFactory.sol")
 //
 //
-// contract('GnosisSafePersonalEdition using eth_signTypedData', function(accounts) {
+// contract('GnosisSafePersonalEdition using eth_signTypedData', function(oracles) {
 //
 //     let gnosisSafe
-//     let executor = accounts[8]
+//     let executor = oracles[8]
 //
 //     const CALL = 0
 //     const CREATE = 2
@@ -34,9 +34,9 @@
 //         // Create Master Copies
 //         let proxyFactory = await ProxyFactory.new()
 //         let gnosisSafeMasterCopy = await GnosisSafe.new()
-//         gnosisSafeMasterCopy.setup([accounts[0], accounts[1], accounts[2]], 2, 0, "0x")
+//         gnosisSafeMasterCopy.setup([oracles[0], oracles[1], oracles[2]], 2, 0, "0x")
 //         // Create Gnosis Safe
-//         let gnosisSafeData = await gnosisSafeMasterCopy.contract.setup.getData([accounts[0], accounts[1], accounts[2]], 2, 0, "0x")
+//         let gnosisSafeData = await gnosisSafeMasterCopy.contract.setup.getData([oracles[0], oracles[1], oracles[2]], 2, 0, "0x")
 //         gnosisSafe = utils.getParamFromTxEvent(
 //             await proxyFactory.createProxy(gnosisSafeMasterCopy.address, gnosisSafeData),
 //             'ProxyCreation', 'proxy', proxyFactory.address, GnosisSafe, 'create Gnosis Safe',
@@ -46,12 +46,12 @@
 //     it('should deposit and withdraw 1 ETH', async () => {
 //         // Deposit 1 ETH + some spare money for execution
 //         assert.equal(await web3.eth.getBalance(gnosisSafe.address), 0)
-//         await web3.eth.sendTransaction({from: accounts[9], to: gnosisSafe.address, value: web3.toWei(1.1, 'ether')})
+//         await web3.eth.sendTransaction({from: oracles[9], to: gnosisSafe.address, value: web3.toWei(1.1, 'ether')})
 //         assert.equal(await web3.eth.getBalance(gnosisSafe.address).toNumber(), web3.toWei(1.1, 'ether'))
 //
 //         let executorBalance = await web3.eth.getBalance(executor).toNumber()
 //
-//         let confirmingAccounts = [accounts[0], accounts[2]]
+//         let confirmingAccounts = [oracles[0], oracles[2]]
 //         let signer = async function(to, value, data, operation, txGasEstimate, dataGasEstimate, gasPrice, txGasToken, refundReceiver, nonce) {
 //             let typedData = {
 //                 types: {
@@ -98,12 +98,12 @@
 //         }
 //
 //         // Withdraw 1 ETH
-//         await safeUtils.executeTransactionWithSigner(signer, gnosisSafe, 'executeTransaction withdraw 0.5 ETH', confirmingAccounts, accounts[9], web3.toWei(0.5, 'ether'), "0x", CALL, executor)
+//         await safeUtils.executeTransactionWithSigner(signer, gnosisSafe, 'executeTransaction withdraw 0.5 ETH', confirmingAccounts, oracles[9], web3.toWei(0.5, 'ether'), "0x", CALL, executor)
 //
-//         await safeUtils.executeTransactionWithSigner(signer, gnosisSafe, 'executeTransaction withdraw 0.5 ETH', confirmingAccounts, accounts[9], web3.toWei(0.5, 'ether'), "0x", CALL, executor)
+//         await safeUtils.executeTransactionWithSigner(signer, gnosisSafe, 'executeTransaction withdraw 0.5 ETH', confirmingAccounts, oracles[9], web3.toWei(0.5, 'ether'), "0x", CALL, executor)
 //
 //         // Should fail as it is over the balance (payment should still happen)
-//         await safeUtils.executeTransactionWithSigner(signer, gnosisSafe, 'executeTransaction withdraw 0.5 ETH', confirmingAccounts, accounts[9], web3.toWei(0.5, 'ether'), "0x", CALL, executor, { fails: true })
+//         await safeUtils.executeTransactionWithSigner(signer, gnosisSafe, 'executeTransaction withdraw 0.5 ETH', confirmingAccounts, oracles[9], web3.toWei(0.5, 'ether'), "0x", CALL, executor, { fails: true })
 //
 //         let executorDiff = await web3.eth.getBalance(executor) - executorBalance
 //         console.log("    Executor earned " + web3.fromWei(executorDiff, 'ether') + " ETH")

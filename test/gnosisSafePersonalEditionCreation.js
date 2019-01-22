@@ -9,7 +9,7 @@
 // const MockContract = artifacts.require('./MockContract.sol');
 // const MockToken = artifacts.require('./Token.sol');
 //
-// contract('GnosisSafePersonalEdition', function(accounts) {
+// contract('GnosisSafePersonalEdition', function(oracles) {
 //
 //     const CALL = 0
 //
@@ -47,7 +47,7 @@
 //     }
 //
 //     let getCreationData = async function(gasToken, userCosts, gasLimit) {
-//         gnosisSafeData = await gnosisSafeMasterCopy.contract.setup.getData([lw.accounts[0], lw.accounts[1], lw.accounts[2]], 2, 0, "0x")
+//         gnosisSafeData = await gnosisSafeMasterCopy.contract.setup.getData([lw.oracles[0], lw.oracles[1], lw.oracles[2]], 2, 0, "0x")
 //
 //         let rawTx = {
 //             value: 0,
@@ -83,17 +83,17 @@
 //     }
 //
 //     beforeEach(async function () {
-//         funder = accounts[5]
+//         funder = oracles[5]
 //         // Create lightwallet
 //         lw = await utils.createLightwallet()
 //         gnosisSafeMasterCopy = await GnosisSafe.new()
-//         gnosisSafeMasterCopy.setup([accounts[0]], 1, 0, "0x")
+//         gnosisSafeMasterCopy.setup([oracles[0]], 1, 0, "0x")
 //     })
 //
 //     it('should create safe from random account and pay in ETH', async () => {
 //
 //         // Estimate safe creation costs
-//         let gnosisSafeData = await gnosisSafeMasterCopy.contract.setup.getData([lw.accounts[0], lw.accounts[1], lw.accounts[2]], 2, 0, "0x")
+//         let gnosisSafeData = await gnosisSafeMasterCopy.contract.setup.getData([lw.oracles[0], lw.oracles[1], lw.oracles[2]], 2, 0, "0x")
 //
 //         let rawTx = {
 //             value: 0,
@@ -104,7 +104,7 @@
 //         let creationData = await getCreationData(0, (estimate + 21000) * gasPrice, estimate)
 //
 //         // User funds safe
-//         await web3.eth.sendTransaction({from: accounts[1], to: creationData.safe, value: creationData.userCosts})
+//         await web3.eth.sendTransaction({from: oracles[1], to: creationData.safe, value: creationData.userCosts})
 //         assert.equal(await web3.eth.getBalance(creationData.safe).toNumber(), creationData.userCosts)
 //         let funderBalance = await web3.eth.getBalance(funder).toNumber()
 //
@@ -112,23 +112,23 @@
 //         assert.equal(await web3.eth.getCode(creationData.safe), payingProxyJson.deployedBytecode)
 //
 //         let gnosisSafe = GnosisSafe.at(creationData.safe)
-//         assert.deepEqual(await gnosisSafe.getOwners(), [lw.accounts[0], lw.accounts[1], lw.accounts[2]])
+//         assert.deepEqual(await gnosisSafe.getOwners(), [lw.oracles[0], lw.oracles[1], lw.oracles[2]])
 //         assert.equal(await web3.eth.getBalance(funder).toNumber(), funderBalance)
 //
-//         await web3.eth.sendTransaction({from: accounts[1], to: gnosisSafe.address, value: web3.toWei(1.1, 'ether')})
-//         await safeUtils.executeTransaction(lw, gnosisSafe, 'executeTransaction withdraw 0.5 ETH', [lw.accounts[0], lw.accounts[2]], accounts[0], web3.toWei(0.5, 'ether'), "0x", CALL, accounts[8])
-//         await safeUtils.executeTransaction(lw, gnosisSafe, 'executeTransaction withdraw 0.5 ETH', [lw.accounts[0], lw.accounts[2]], accounts[0], web3.toWei(0.5, 'ether'), "0x", CALL, accounts[8])
+//         await web3.eth.sendTransaction({from: oracles[1], to: gnosisSafe.address, value: web3.toWei(1.1, 'ether')})
+//         await safeUtils.executeTransaction(lw, gnosisSafe, 'executeTransaction withdraw 0.5 ETH', [lw.oracles[0], lw.oracles[2]], oracles[0], web3.toWei(0.5, 'ether'), "0x", CALL, oracles[8])
+//         await safeUtils.executeTransaction(lw, gnosisSafe, 'executeTransaction withdraw 0.5 ETH', [lw.oracles[0], lw.oracles[2]], oracles[0], web3.toWei(0.5, 'ether'), "0x", CALL, oracles[8])
 //     })
 //
 //     it('should create safe from random account and pay with token', async () => {
 //         // Deploy token
-//         let token = await safeUtils.deployToken(accounts[0])
+//         let token = await safeUtils.deployToken(oracles[0])
 //
 //         // We just set an fix amount of tokens to pay
 //         let creationData = await getCreationData(token.address, 1337)
 //
 //         // User funds safe
-//         token.transfer(creationData.safe, creationData.userCosts, {from: accounts[0]})
+//         token.transfer(creationData.safe, creationData.userCosts, {from: oracles[0]})
 //         assert.equal(await token.balances(creationData.safe), creationData.userCosts);
 //         assert.equal(await token.balances(funder), 0)
 //
@@ -136,16 +136,16 @@
 //         assert.equal(await web3.eth.getCode(creationData.safe), payingProxyJson.deployedBytecode)
 //
 //         let gnosisSafe = GnosisSafe.at(creationData.safe)
-//         assert.deepEqual(await gnosisSafe.getOwners(), [lw.accounts[0], lw.accounts[1], lw.accounts[2]])
+//         assert.deepEqual(await gnosisSafe.getOwners(), [lw.oracles[0], lw.oracles[1], lw.oracles[2]])
 //         assert.equal(await token.balances(funder), creationData.userCosts)
 //         assert.equal(await token.balances(gnosisSafe.address), 0)
 //
-//         token.transfer(gnosisSafe.address, 3141596, {from: accounts[0]})
-//         let data = await token.transfer.getData(accounts[1], 212121)
-//         await safeUtils.executeTransaction(lw, gnosisSafe, 'executeTransaction token transfer', [lw.accounts[0], lw.accounts[2]], token.address, 0, data, CALL, accounts[8], { gasToken: token.address })
-//         await safeUtils.executeTransaction(lw, gnosisSafe, 'executeTransaction token transfer', [lw.accounts[0], lw.accounts[2]], token.address, 0, data, CALL, accounts[8], { gasToken: token.address })
+//         token.transfer(gnosisSafe.address, 3141596, {from: oracles[0]})
+//         let data = await token.transfer.getData(oracles[1], 212121)
+//         await safeUtils.executeTransaction(lw, gnosisSafe, 'executeTransaction token transfer', [lw.oracles[0], lw.oracles[2]], token.address, 0, data, CALL, oracles[8], { gasToken: token.address })
+//         await safeUtils.executeTransaction(lw, gnosisSafe, 'executeTransaction token transfer', [lw.oracles[0], lw.oracles[2]], token.address, 0, data, CALL, oracles[8], { gasToken: token.address })
 //
-//         assert.equal(await token.balances(accounts[1]), 424242)
+//         assert.equal(await token.balances(oracles[1]), 424242)
 //     })
 //
 //     it('should fail if ether payment fails', async () => {
@@ -157,7 +157,7 @@
 //
 //     it('should fail if token payment fails', async () => {
 //         // Deploy token
-//         let token = await safeUtils.deployToken(accounts[0])
+//         let token = await safeUtils.deployToken(oracles[0])
 //
 //         // We just set an fix amount of tokens to pay
 //         let creationData = await getCreationData(token.address, 1337)

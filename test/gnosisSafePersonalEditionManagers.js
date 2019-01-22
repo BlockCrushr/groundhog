@@ -3,7 +3,7 @@
 // const GnosisSafe = artifacts.require("./GnosisSafe.sol")
 // const ProxyFactory = artifacts.require("./ProxyFactory.sol")
 //
-// contract('GnosisSafePersonalEdition', function(accounts) {
+// contract('GnosisSafePersonalEdition', function(oracles) {
 //
 //     let gnosisSafe
 //     let lw
@@ -14,10 +14,10 @@
 //         // Create Master Copies
 //         let proxyFactory = await ProxyFactory.new()
 //         let gnosisSafeMasterCopy = await GnosisSafe.new()
-//         gnosisSafeMasterCopy.setup([lw.accounts[0], lw.accounts[1], lw.accounts[2]], 2, 0, "0x")
+//         gnosisSafeMasterCopy.setup([lw.oracles[0], lw.oracles[1], lw.oracles[2]], 2, 0, "0x")
 //
 //         // Create Gnosis Safe
-//         let gnosisSafeData = await gnosisSafeMasterCopy.contract.setup.getData([lw.accounts[0], lw.accounts[1], lw.accounts[2]], 2, 0, "0x")
+//         let gnosisSafeData = await gnosisSafeMasterCopy.contract.setup.getData([lw.oracles[0], lw.oracles[1], lw.oracles[2]], 2, 0, "0x")
 //         gnosisSafe = utils.getParamFromTxEvent(
 //             await proxyFactory.createProxy(gnosisSafeMasterCopy.address, gnosisSafeData),
 //             'ProxyCreation', 'proxy', proxyFactory.address, GnosisSafe, 'create Gnosis Safe',

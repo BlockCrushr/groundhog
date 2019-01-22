@@ -63,7 +63,19 @@ async function getParamFromTxEvent(transaction, eventName, paramName, contract, 
 
     let events = transaction.events[eventName];
     let param;
-    if (typeof events === "object") {
+    if (events.length > 1) {
+
+        // logs = [];
+        // events.forEach(ev => {
+        //     const rv = ev.returnValues;
+        //     logs = logs + Object.keys(rv).filter((k, v) => {
+        //         if (k === paramName) {
+        //             return rv[k];
+        //         }
+        //     })
+        // })
+        param = events[1].returnValues[paramName]
+    } else {
         if (eventName != null && events.address === contract) {
             const rv = events.returnValues;
             logs = Object.keys(rv).filter((k, v) => {
@@ -86,17 +98,19 @@ async function getParamFromTxEvent(transaction, eventName, paramName, contract, 
     }
 }
 
-function checkTxEvent(transaction, eventName, contract, exists, subject) {
+async function checkTxEvent(transaction, eventName, contract, exists, subject) {
     assert.isObject(transaction)
     if (subject && subject != null) {
         logGasUsage(subject, transaction)
     }
-    let logs = transaction.logs
     if (eventName != null) {
-        logs = logs.filter((l) => l.event === eventName && l.address === contract)
+        let logs = await contract.getPastEvents(eventName, {fromBlock: transaction.blockNumber})
+
+        logs = logs.filter((l) => l.event === eventName && l.address === contract.options.address)
+        assert.equal(logs.length, exists ? 1 : 0, exists ? 'event was not present' : 'event should not be present')
+        return exists ? logs[0] : null
     }
-    assert.equal(logs.length, exists ? 1 : 0, exists ? 'event was not present' : 'event should not be present')
-    return exists ? logs[0] : null
+    return null;
 }
 
 function logGasUsage(subject, transactionOrReceipt) {
@@ -105,7 +119,7 @@ function logGasUsage(subject, transactionOrReceipt) {
 }
 
 async function createLightwallet() {
-    // Create lightwallet accounts
+    // Create lightwallet oracles
     const createVault = util.promisify(lightwallet.keystore.createVault).bind(lightwallet.keystore)
     const keystore = await createVault({
         hdPathString: "m/44'/60'/0'/0",

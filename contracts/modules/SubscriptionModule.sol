@@ -1,21 +1,23 @@
 pragma solidity ^0.5.0;
+
 import "../base/Module.sol";
 import "../base/OwnerManager.sol";
 import "../common/GEnum.sol";
 import "../common/SignatureDecoder.sol";
 import "../external/BokkyPooBahsDateTimeLibrary.sol";
-import "../external/SafeMath.sol";
+import "../external/Math.sol";
+import "../OracleRegistry.sol";
 
 /// @title SubscriptionModule - A module with support for Subscription Payments
 /// @author Andrew Redden - <andrew@groundhog.network>
 contract SubscriptionModule is Module, SignatureDecoder {
 
     using BokkyPooBahsDateTimeLibrary for uint;
-    using SafeMath for uint;
+    using DSMath for uint;
     string public constant NAME = "Groundhog";
     string public constant VERSION = "0.0.1";
     bytes32 public domainSeparator;
-
+    address public oracleRegistry;
 
     //keccak256(
     //    "EIP712Domain(address verifyingContract, string NAME, string VERSION)"
@@ -38,14 +40,17 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
     event PaymentFailed(bytes32 subscriptionHash);
     event ProcessingFailed();
+    event DynamicPayment(uint256 conversionRate, uint256 paymentTotal);
 
     /// @dev Setup function sets manager
-    function setup()
-        public
+    function setup(address _oracleRegistry)
+    public
     {
         setManager();
         require(domainSeparator == 0, "Domain Separator already set!");
-        domainSeparator = keccak256(abi.encode(DOMAIN_SEPARATOR_TYPEHASH, this));
+        domainSeparator = keccak256(abi.encode(DOMAIN_SEPARATOR_TYPEHASH, address(this)));
+        require(oracleRegistry == address(0), "MakerDAO Price Feed already set!");
+        oracleRegistry = _oracleRegistry;
     }
 
     /// @dev Allows to execute a Safe transaction confirmed by required number of owners and then pays the account that submitted the transaction.
@@ -76,7 +81,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
         bytes memory meta,
         bytes memory signatures
     )
-        public
+    public
     {
         uint256 startGas = gasleft();
 
@@ -102,27 +107,40 @@ contract SubscriptionModule is Module, SignatureDecoder {
     function processMeta(
         bytes memory meta
     )
-        internal
-        pure
-        returns (uint256[3] memory outMeta)
+    internal
+    view
+    returns (uint256 conversionRate, uint256[3] memory outMeta)
     {
+        uint256 oracle;
         uint256 period;
         uint256 offChainID;
         uint256 expire;
 
         // solium-disable-next-line security/no-inline-assembly
         assembly {
-            period := mload(add(meta, add(0x20, 0)))
+            oracle := mload(add(meta, add(0x20, 0)))
         }
         // solium-disable-next-line security/no-inline-assembly
         assembly {
-            offChainID := mload(add(meta, add(0x20, 32)))
+            period := mload(add(meta, add(0x20, 32)))
         }
         // solium-disable-next-line security/no-inline-assembly
         assembly {
-            expire := mload(add(meta, add(0x20, 64)))
+            offChainID := mload(add(meta, add(0x20, 64)))
         }
-        return [period, offChainID, expire];
+        // solium-disable-next-line security/no-inline-assembly
+        assembly {
+            expire := mload(add(meta, add(0x20, 96)))
+        }
+
+        if (oracle != uint256(0)) {
+            bytes32 rate = OracleRegistry(oracleRegistry).read(oracle);
+            conversionRate = uint256(rate);
+        } else {
+            conversionRate = uint256(0);
+        }
+
+        return (conversionRate, [period, offChainID, expire]);
     }
 
     function paySubscription(
@@ -133,13 +151,29 @@ contract SubscriptionModule is Module, SignatureDecoder {
         bytes32 subHash,
         bytes memory meta
     )
-        internal
-        returns (bool success)
+    internal
+    returns (bool success)
     {
 
-        success = processSub(subHash, processMeta(meta));
+        uint256 conversionRate;
+        uint256[3] memory processedMetaData;
 
-        success = manager.execTransactionFromModule(to, value, data, operation);
+        (conversionRate, processedMetaData) = processMeta(meta);
+
+        processSub(subHash, processedMetaData);
+
+        //Oracle MKRPriceFeed data is in slot1
+        if (conversionRate != uint256(0)) {
+
+            require(value > 1.00 ether, "INVALID_FORMAT: MKRPriceFeedValue");
+            uint256 payment = value.wdiv(conversionRate);
+
+            success = manager.execTransactionFromModule(to, payment, "0x", operation);
+            emit DynamicPayment(conversionRate, payment);
+        } else {
+            success = manager.execTransactionFromModule(to, value, data, operation);
+        }
+
     }
 
     function handleTxPayment(
@@ -149,9 +183,9 @@ contract SubscriptionModule is Module, SignatureDecoder {
         address gasToken,
         address payable refundReceiver
     )
-        private
+    private
     {
-        uint256 amount = ((gasUsed - gasleft()) + dataGas) * gasPrice;
+        uint256 amount = (gasUsed.sub(gasleft()).add(dataGas).mul(gasPrice));
         // solium-disable-next-line security/no-tx-origin
         address receiver = refundReceiver == address(0) ? tx.origin : refundReceiver;
         if (gasToken == address(0)) {
@@ -169,9 +203,9 @@ contract SubscriptionModule is Module, SignatureDecoder {
         bytes32 transactionHash,
         bytes memory signatures
     )
-        internal
-        view
-        returns (bool valid)
+    internal
+    view
+    returns (bool valid)
     {
         // There cannot be an owner with address 0.
         address lastOwner = address(0);
@@ -198,9 +232,9 @@ contract SubscriptionModule is Module, SignatureDecoder {
         bytes32 subscriptionHash,
         bytes memory signatures
     )
-        public
-        view
-        returns (bool isValid)
+    public
+    view
+    returns (bool isValid)
     {
         if (subscriptions[subscriptionHash].status == GEnum.SubscriptionStatus.VALID) {
             return true;
@@ -229,8 +263,8 @@ contract SubscriptionModule is Module, SignatureDecoder {
         bytes memory meta,
         bytes memory signatures
     )
-        public
-        returns (bool)
+    public
+    returns (bool)
     {
         bytes memory subHashData = encodeSubscriptionData(
             to, value, data, operation,
@@ -252,8 +286,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
         bytes32 subHash,
         uint256[3] memory pmeta
     )
-        internal
-        returns (bool)
+    internal
     {
         uint256 period = pmeta[0];
         uint256 offChainID = pmeta[1];
@@ -294,20 +327,20 @@ contract SubscriptionModule is Module, SignatureDecoder {
         if (sub.expires != 0 && sub.nextWithdraw > sub.expires) {
             sub.status = GEnum.SubscriptionStatus.EXPIRED;
         }
-        return true;
     }
 
 
     function getSubscriptionMetaBytes(
+        uint256 oracle,
         uint256 period,
         uint256 offChainID,
         uint256 expires
     )
-        public
-        pure
-        returns (bytes memory)
+    public
+    pure
+    returns (bytes memory)
     {
-        return abi.encodePacked(period, offChainID, expires);
+        return abi.encodePacked(oracle, period, offChainID, expires);
     }
 
     /// @dev Returns hash to be signed by owners.
@@ -333,9 +366,9 @@ contract SubscriptionModule is Module, SignatureDecoder {
         address refundAddress,
         bytes memory meta
     )
-        public
-        view
-        returns (bytes32)
+    public
+    view
+    returns (bytes32)
     {
         return keccak256(encodeSubscriptionData(to, value, data, operation, safeTxGas, dataGas, gasPrice, gasToken, refundAddress, meta));
     }
@@ -362,9 +395,9 @@ contract SubscriptionModule is Module, SignatureDecoder {
         address refundAddress,
         bytes memory meta
     )
-        public
-        view
-        returns (bytes memory)
+    public
+    view
+    returns (bytes memory)
     {
         bytes32 safeSubTxHash = keccak256(
             abi.encode(SAFE_SUB_TX_TYPEHASH, to, value, keccak256(data), operation, safeTxGas, dataGas, gasPrice, gasToken, refundAddress, keccak256(meta))
@@ -391,17 +424,18 @@ contract SubscriptionModule is Module, SignatureDecoder {
         Enum.Operation operation,
         bytes memory meta
     )
-        public
-        authorized
-        returns (uint256)
+    public
+    authorized
+    returns (uint256)
     {
         uint256 startGas = gasleft();
         // We don't provide an error message here, as we use it to return the estimate
         // solium-disable-next-line error-reason
 
-        uint256[3] memory pMeta = processMeta(meta);
+        (uint256 conversionRate, uint256[3] memory pMeta) = processMeta(meta);
+
         require(manager.execTransactionFromModule(to, value, data, operation));
-        uint256 requiredGas = startGas - gasleft();
+        uint256 requiredGas = startGas.sub(gasleft());
         // Convert response to string and return via error message
         revert(string(abi.encodePacked(requiredGas)));
 
