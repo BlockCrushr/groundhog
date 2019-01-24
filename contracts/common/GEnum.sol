@@ -8,7 +8,8 @@ contract GEnum {
         VALID,
         CANCELLED,
         EXPIRED,
-        PAYMENT_FAILED
+        PAYMENT_FAILED,
+        TRIAL
     }
 
     enum Period {

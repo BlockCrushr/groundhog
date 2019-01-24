@@ -15,12 +15,15 @@ var DSFeed = artifacts.require("./DSFeed.sol");
 const notOwnedAddress = "0x0000000000000000000000000000000000000002"
 const notOwnedAddress2 = "0x0000000000000000000000000000000000000003"
 
-module.exports = function(deployer) {
+module.exports = function (deployer) {
 
 
     deployer.deploy(ProxyFactory, PayingProxy.bytecode)
-    deployer.deploy(OracleRegistry)
-    deployer.deploy(DSFeed)
+    deployer.deploy(DSFeed).then(feed => {
+        return deployer.deploy(OracleRegistry).then(or => {
+            or.setup([feed], [web3.utils.fromAscii('ethusd')])
+        })
+    })
     deployer.deploy(GnosisSafe).then(function (safe) {
         safe.setup([notOwnedAddress], 1, 0, 0)
         return safe

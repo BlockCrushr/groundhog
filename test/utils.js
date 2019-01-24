@@ -2,29 +2,6 @@ const util = require('util');
 const solc = require('solc')
 const lightwallet = require('eth-lightwallet')
 const abi = require("ethereumjs-abi");
-const ModuleDataWrapper = new web3.eth.Contract([
-    {
-        "constant": false,
-        "inputs": [
-            {
-                "name": "data",
-                "type": "bytes"
-            }
-        ],
-        "name": "setup",
-        "outputs": [],
-        "payable": false,
-        "stateMutability": "nonpayable",
-        "type": "function"
-    }
-]);
-
-function createAndAddModulesData(dataArray) {
-    // Remove method id (10) and position of data in payload (64)
-    let mw = ModuleDataWrapper
-    mw.options.address = "0x155be870022842b7C3B9097eCEd5a7a92003a149"
-    return dataArray.reduce((acc, data) => acc + mw.methods.setup(data).encodeABI().substr(74), "0x")
-}
 
 function currentTimeNs() {
     const hrTime = process.hrtime();
@@ -40,7 +17,6 @@ function dataGasValue(hexValue) {
         default:
             return 68
     }
-    ;
 }
 
 function estimateDataGasCosts(dataString) {
@@ -159,6 +135,19 @@ async function assertRejects(q, msg) {
     return res
 }
 
+const shouldFailWithMessage = async (promise, message) => {
+    try {
+        await promise;
+    } catch (error) {
+        if (message) {
+            assert.ok(error.message.search(message) > 0)
+        }
+        return;
+    }
+
+    assert.fail('Expected failure not received');
+}
+
 async function getErrorMessage(to, value, data, from) {
     let returnData = await web3.eth.call({to: to, from: from, value: value, data: data})
     let returnBuffer = Buffer.from(returnData.slice(2), "hex")
@@ -194,7 +183,7 @@ async function compile(source) {
 }
 
 Object.assign(exports, {
-    createAndAddModulesData,
+    // createAndAddModulesData,
     currentTimeNs,
     compile,
     getParamFromTxEvent,
@@ -205,5 +194,6 @@ Object.assign(exports, {
     signTransaction,
     assertRejects,
     estimateDataGasCosts,
-    getErrorMessage
+    getErrorMessage,
+    shouldFailWithMessage
 })
