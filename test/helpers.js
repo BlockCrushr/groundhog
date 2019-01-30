@@ -1,12 +1,10 @@
 const Web3 = require("web3") // import web3 v1.0 constructor
 
-// use globally injected web3 to find the currentProvider and wrap with web3 v1.0
 const getWeb3 = () => {
     const myWeb3 = new Web3(web3.currentProvider)
     return myWeb3
 }
 
-// assumes passed-in web3 is v1.0 and creates a function to receive contract name
 const getContractInstance = (web3) => async (contractName, opts) => {
     opts = opts || {
         localABI: null,
@@ -20,7 +18,7 @@ const getContractInstance = (web3) => async (contractName, opts) => {
         return new web3.eth.Contract(opts.localABI, "0x72fE0d6A3E4CB16918A1c658f0856f3D9c64e3d4");
     }
 
-    const artifact = artifacts.require(contractName) // globally injected artifacts helper
+    const artifact = artifacts.require(contractName);
 
     let instance = null;
     let newArtifact = null;
@@ -45,24 +43,7 @@ const getContractInstance = (web3) => async (contractName, opts) => {
 
     return instance;
 }
-//
-// // assumes passed-in web3 is v1.0 and creates a function to receive contract name
-// const getNewContractInstance = (web3) => async (contractName, deployArgs = []) => {
-//     const artifact = artifacts.require(contractName) // globally injected artifacts helper
-//     let newArtifact = null;
-//     if (deployArgs.length === 1) {
-//         newArtifact = await artifact.new(deployArgs[0]);
-//     } else {
-//         newArtifact = await artifact.new(deployArgs);
-//     }
-//     const instance = new web3.eth.Contract(artifact.abi, newArtifact.address)
-//     return instance
-// }
 
-
-// deterministically computes the smart contract address given
-// the account the will deploy the contract (factory contract)
-// the salt as uint256 and the contract bytecode
 const create2Address = (creatorAddress, saltHex, byteCode) => {
     return `0x${web3.utils.sha3(`0x${[
         'ff',
@@ -90,8 +71,16 @@ const isContract = async (address) => {
     return code.slice(2).length > 0
 }
 
+const getStorageAt = async (address, slot = 0) => {
+    const storage = await web3.eth.getStoragetAt(address, slot)
+    return storage;
+}
+
 module.exports = {
     getWeb3,
+    getStorageAt,
+    isContract,
+    encodeParam,
     getContractInstance: getContractInstance,
     create2Address: create2Address,
     num2uint: numberToUint256

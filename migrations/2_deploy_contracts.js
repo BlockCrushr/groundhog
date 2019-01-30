@@ -22,6 +22,7 @@ module.exports = function (deployer) {
     deployer.deploy(DSFeed).then(feed => {
         return deployer.deploy(OracleRegistry).then(or => {
             or.setup([feed], [web3.utils.fromAscii('ethusd')])
+            return or;
         })
     })
     deployer.deploy(GnosisSafe).then(function (safe) {
@@ -33,6 +34,7 @@ module.exports = function (deployer) {
         module.setup(notOwnedAddress)
         return module;
     });
+
     deployer.deploy(ModuleDataWrapper).then(function (module) {
         module.setup()
         return module;

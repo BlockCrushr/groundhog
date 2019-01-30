@@ -1,7 +1,7 @@
 const HDWalletProvider = require('truffle-hdwallet-provider')
 
-const mnemonic = process.env.MNEMONIC
-const token = process.env.INFURA_TOKEN
+const mnemonic = process.env.MNEMONIC;
+const token = process.env.INFURA_TOKEN;
 
 module.exports = {
   networks: {

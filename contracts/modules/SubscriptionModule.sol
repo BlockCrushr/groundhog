@@ -16,6 +16,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
     using DSMath for uint;
     string public constant NAME = "Groundhog";
     string public constant VERSION = "0.0.1";
+
     bytes32 public domainSeparator;
     address public oracleRegistry;
 
@@ -35,23 +36,25 @@ contract SubscriptionModule is Module, SignatureDecoder {
         GEnum.SubscriptionStatus status;
         uint256 nextWithdraw;
         uint256 offChainID;
-        uint256 expires;
+        uint256 endDate;
     }
 
     event PaymentFailed(bytes32 subscriptionHash);
     event ProcessingFailed();
-    event DynamicPayment(uint256 conversionRate, uint256 paymentTotal);
-    event SubscriptionCancelled(bytes32 subHash);
-    event SubscriptionProcessed(bytes32 subHash);
+    event DynamicPayment(uint256 dynPriceFormat, uint256 conversionRate, uint256 paymentTotal);
+    event Cancelled(bytes32 subHash);
+    event Processed(bytes32 subHash);
+    event StatusChanged(GEnum.SubscriptionStatus previous, GEnum.SubscriptionStatus next);
+    event LogUint(uint256);
 
     /// @dev Setup function sets manager
     function setup(address _oracleRegistry)
     public
     {
         setManager();
-        require(domainSeparator == 0, "VALID_STATE: DOMAIN_SEPARATOR_SET");
+        require(domainSeparator == 0, "INVALID_STATE: DOMAIN_SEPARATOR_SET");
         domainSeparator = keccak256(abi.encode(DOMAIN_SEPARATOR_TYPEHASH, address(this)));
-        require(oracleRegistry == address(0), "VALID_STATE: MKRDAO_FEED_SET");
+        require(oracleRegistry == address(0), "INVALID_STATE: MKRDAO_FEED_SET");
         oracleRegistry = _oracleRegistry;
     }
 
@@ -66,7 +69,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
     /// @param gasPrice Gas price that should be used for the payment calculation.
     /// @param gasToken Token address (or 0 if ETH) that is used for the payment.
     /// @param refundReceiver payout address or 0 if tx.origin
-    /// @param meta Packed bytes data {address refundReceiver (required}, {uint256 period (required}, {uint256 offChainID (required}, {uint256 expires (optional}
+    /// @param meta Packed bytes data {address refundReceiver (required}, {uint256 period (required}, {uint256 offChainID (required}, {uint256 endDate (optional}
     /// @param signatures Packed signature data ({bytes32 r}{bytes32 s}{uint8 v})
     /// @return success boolean value of execution
 
@@ -113,13 +116,19 @@ contract SubscriptionModule is Module, SignatureDecoder {
     view
     returns (uint256 conversionRate, uint256[4] memory outMeta)
     {
-        require(meta.length == 160, "INVALID_DATA: META_LENGTH");  //5 slots
+        require(meta.length == 160, "INVALID_DATA: META_LENGTH");
+        //5 slots
 
-        uint256 oracle; //slot1
-        uint256 period; //slot2
-        uint256 offChainID; //slot3
-        uint256 startDate; //slot4
-        uint256 expire; //slot5
+        uint256 oracle;
+        //slot1
+        uint256 period;
+        //slot2
+        uint256 offChainID;
+        //slot3
+        uint256 startDate;
+        //slot4
+        uint256 expire;
+        //slot5
 
         // solium-disable-next-line security/no-inline-assembly
         assembly {
@@ -161,27 +170,29 @@ contract SubscriptionModule is Module, SignatureDecoder {
         bytes memory meta
     )
     internal
-    returns (bool success)
     {
         uint256 conversionRate;
         uint256[4] memory processedMetaData;
 
         (conversionRate, processedMetaData) = processMeta(meta);
 
-        processSub(subHash, processedMetaData);
+        bool processPayment = processSub(subHash, processedMetaData);
 
-        //Oracle Registry address data is in slot1
-        if (conversionRate != uint256(0)) {
+        if (processPayment) {
 
-            require(value > 1.00 ether, "INVALID_FORMAT: PRICE_FEED");
+            //Oracle Registry address data is in slot1
+            if (conversionRate != uint256(0)) {
 
-            uint256 payment = value.wdiv(conversionRate);
+                require(value > 1.00 ether, "INVALID_FORMAT: DYNAMIC_PRICE_FORMAT");
 
-            success = manager.execTransactionFromModule(to, payment, "0x", operation);
+                uint256 payment = value.wdiv(conversionRate);
 
-            emit DynamicPayment(conversionRate, payment);
-        } else {
-            success = manager.execTransactionFromModule(to, value, data, operation);
+                emit DynamicPayment(value, conversionRate, payment);
+
+                value = payment;
+            }
+
+            require(manager.execTransactionFromModule(to, value, data, operation), "INVALID_EXEC: PAY_SUB");
         }
     }
 
@@ -248,13 +259,13 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
         Meta storage sub = subscriptions[subscriptionHash];
 
-        if(sub.status == GEnum.SubscriptionStatus.TRIAL && sub.nextWithdraw <= now) {
+        if (sub.status == GEnum.SubscriptionStatus.TRIAL && sub.nextWithdraw <= now) {
             return true;
         } else if (sub.status == GEnum.SubscriptionStatus.VALID) {
             return true;
         } else if (sub.status == GEnum.SubscriptionStatus.EXPIRED) {
-            require(sub.expires != 0, "INVALID_STATE: SUB_EXPIRES");
-            return (now <= sub.expires);
+            require(sub.endDate != 0, "INVALID_STATE: SUB_EXPIRES");
+            return (now <= sub.endDate);
         } else if (sub.status == GEnum.SubscriptionStatus.INIT) {
             return checkHash(subscriptionHash, signatures);
         }
@@ -268,17 +279,17 @@ contract SubscriptionModule is Module, SignatureDecoder {
     public
     returns (bool) {
         Meta storage sub = subscriptions[subHash];
-        require((sub.status != GEnum.SubscriptionStatus.CANCELLED) && (sub.status != GEnum.SubscriptionStatus.INIT) && (sub.status != GEnum.SubscriptionStatus.EXPIRED), "INVALID_STATE: SUB_STATUS");
+        require((sub.status != GEnum.SubscriptionStatus.CANCELLED) && (sub.status != GEnum.SubscriptionStatus.EXPIRED), "INVALID_STATE: SUB_STATUS");
 
         sub.status = GEnum.SubscriptionStatus.CANCELLED;
-        emit SubscriptionCancelled(subHash);
+        emit Cancelled(subHash);
         return true;
     }
 
     /// @dev Allows to execute a Safe transaction confirmed by required number of owners and then pays the account that submitted the transaction.
     ///      Note: The fees are always transferred, even if the user transaction fails.
     /// @return bool hash of on sub to revoke or cancel
-    function cancelSubscription(
+    function cancelSubscriptionAsOwner(
         address to,
         uint256 value,
         bytes memory data,
@@ -294,19 +305,22 @@ contract SubscriptionModule is Module, SignatureDecoder {
     public
     returns (bool)
     {
+        require(OwnerManager(address(manager)).isOwner(msg.sender), "INVALID_DATA: MSG_SENDER_NOT_OWNER");
+
         bytes memory subHashData = encodeSubscriptionData(
             to, value, data, operation,
             safeTxGas, dataGas, gasPrice, gasToken, refundReceiver,
             meta
         );
+
         Meta storage sub = subscriptions[keccak256(subHashData)];
 
-        require(sub.status != GEnum.SubscriptionStatus.CANCELLED, "INVALID_STATE: SUB_STATUS");
+        require((sub.status != GEnum.SubscriptionStatus.CANCELLED) && (sub.status != GEnum.SubscriptionStatus.EXPIRED), "INVALID_STATE: SUB_STATUS");
         require(checkHash(keccak256(subHashData), signatures), "INVALID_DATA: SIGNATURES_INVALID");
 
         sub.status = GEnum.SubscriptionStatus.CANCELLED;
 
-        emit SubscriptionCancelled(keccak256(subHashData));
+        emit Cancelled(keccak256(subHashData));
         return true;
     }
 
@@ -317,11 +331,12 @@ contract SubscriptionModule is Module, SignatureDecoder {
         uint256[4] memory pmeta
     )
     internal
+    returns (bool)
     {
         uint256 period = pmeta[0];
         uint256 offChainID = pmeta[1];
         uint256 startDate = pmeta[2];
-        uint256 expires = pmeta[3];
+        uint256 endDate = pmeta[3];
 
         uint256 withdrawHolder;
         Meta storage sub = subscriptions[subHash];
@@ -331,9 +346,9 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
         if (sub.status == GEnum.SubscriptionStatus.INIT) {
 
-            if (expires != 0) {
-                require(expires > now, "INVALID_DATA: SUB_EXPIRES");
-                sub.expires = expires;
+            if (endDate != 0) {
+                require(endDate > now, "INVALID_DATA: SUB_EXPIRES");
+                sub.endDate = endDate;
             }
 
             if (offChainID != 0) {
@@ -341,18 +356,29 @@ contract SubscriptionModule is Module, SignatureDecoder {
             }
 
             if (startDate != 0) {
-                require(startDate > now, "INVALID_DATA: SUB_STARTDATE");
+//                require(startDate > now, "INVALID_DATA: SUB_STARTDATE");
+
+                emit LogUint(startDate);
+                emit LogUint(now);
                 sub.nextWithdraw = startDate;
                 sub.status = GEnum.SubscriptionStatus.TRIAL;
+                emit StatusChanged(GEnum.SubscriptionStatus.INIT, GEnum.SubscriptionStatus.TRIAL);
+                return false;
             } else {
                 sub.nextWithdraw = now;
                 sub.status = GEnum.SubscriptionStatus.VALID;
+                emit StatusChanged(GEnum.SubscriptionStatus.INIT, GEnum.SubscriptionStatus.VALID);
             }
+
         } else if (sub.status == GEnum.SubscriptionStatus.TRIAL) {
+            require(now >= startDate, "INVALID_STATE: SUB_STARTDATE");
             sub.nextWithdraw = now;
+            sub.status = GEnum.SubscriptionStatus.VALID;
+            emit StatusChanged(GEnum.SubscriptionStatus.TRIAL, GEnum.SubscriptionStatus.VALID);
         }
 
-        require((sub.status == GEnum.SubscriptionStatus.VALID || sub.status == GEnum.SubscriptionStatus.TRIAL), "INVALID_STATE: SUB_STATUS");
+        require(sub.status == GEnum.SubscriptionStatus.VALID, "INVALID_STATE: SUB_STATUS");
+
         require(now >= sub.nextWithdraw, "INVALID_STATE: SUB_NEXTWITHDRAW");
 
         if (period == uint(GEnum.Period.DAY)) {
@@ -367,15 +393,17 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
         //if a subscription is expiring and its next withdraw timeline is beyond hte time of the expiration
         //modify the status
-        if (sub.expires != 0 && withdrawHolder > sub.expires) {
-            sub.status = GEnum.SubscriptionStatus.EXPIRED;
+        if (sub.endDate != 0 && withdrawHolder > sub.endDate) {
             sub.nextWithdraw = 0;
+            emit StatusChanged(sub.status, GEnum.SubscriptionStatus.EXPIRED);
+            sub.status = GEnum.SubscriptionStatus.EXPIRED;
         } else {
             sub.nextWithdraw = withdrawHolder;
         }
 
 
-        emit SubscriptionProcessed(subHash);
+        emit Processed(subHash);
+        return true;
     }
 
 
@@ -384,13 +412,13 @@ contract SubscriptionModule is Module, SignatureDecoder {
         uint256 period,
         uint256 offChainID,
         uint256 startDate,
-        uint256 expires
+        uint256 endDate
     )
     public
     pure
     returns (bytes memory)
     {
-        return abi.encodePacked(oracle, period, offChainID, startDate, expires);
+        return abi.encodePacked(oracle, period, offChainID, startDate, endDate);
     }
 
     /// @dev Returns hash to be signed by owners.
@@ -402,7 +430,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
     /// @param dataGas Gas costs for data used to trigger the safe transaction.
     /// @param gasPrice Maximum gas price that should be used for this transaction.
     /// @param gasToken Token address (or 0 if ETH) that is used for the payment.
-    /// @param meta bytes refundReceiver / period / offChainID / expires
+    /// @param meta bytes refundReceiver / period / offChainID / endDate
     /// @return Subscription hash.
     function getSubscriptionHash(
         address to,
@@ -431,7 +459,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
     /// @param operation Operation type.
     /// @param safeTxGas Fas that should be used for the safe transaction.
     /// @param gasToken Token address (or 0 if ETH) that is used for the payment.
-    /// @param meta bytes packed data(refund address, period, offChainID, expires
+    /// @param meta bytes packed data(refund address, period, offChainID, endDate
     /// @return Subscription hash bytes.
     function encodeSubscriptionData(
         address to,
@@ -475,16 +503,30 @@ contract SubscriptionModule is Module, SignatureDecoder {
         bytes memory meta
     )
     public
-    authorized
     returns (uint256)
     {
+        require(msg.sender == address(this), "INVALID_DATA: MSG_SENDER");
+
         uint256 startGas = gasleft();
         // We don't provide an error message here, as we use it to return the estimate
         // solium-disable-next-line error-reason
 
         (uint256 conversionRate, uint256[4] memory pMeta) = processMeta(meta);
 
-        require(manager.execTransactionFromModule(to, value, data, operation), "INVALID_EXEC");
+        //Oracle Registry address data is in slot1
+        if (conversionRate != uint256(0)) {
+
+            require(value > 1.00 ether, "INVALID_FORMAT: DYNAMIC_PRICE_FORMAT");
+
+            uint256 payment = value.wdiv(conversionRate);
+
+            emit DynamicPayment(value, conversionRate, payment);
+
+            value = payment;
+        }
+
+        require(manager.execTransactionFromModule(to, value, data, operation));
+
         uint256 requiredGas = startGas.sub(gasleft());
         // Convert response to string and return via error message
         revert(string(abi.encodePacked(requiredGas)));

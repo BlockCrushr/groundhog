@@ -1,4 +1,5 @@
 pragma solidity ^0.5.0;
+
 import "../base/Module.sol";
 
 
@@ -10,7 +11,7 @@ contract CreateAndAddModules {
     /// @dev Function required to compile contract. Gnosis Safe function is called instead.
     /// @param module Not used.
     function enableModule(Module module)
-        public
+    public
     {
         revert();
     }
@@ -19,7 +20,7 @@ contract CreateAndAddModules {
     /// @param proxyFactory Module proxy factory contract.
     /// @param data Modules constructor payload. This is the data for each proxy factory call concatinated. (e.g. <byte_array_len_1><byte_array_data_1><byte_array_len_2><byte_array_data_2>)
     function createAndAddModules(address proxyFactory, bytes memory data)
-        public
+    public
     {
         uint256 length = data.length;
         Module module;
@@ -31,13 +32,22 @@ contract CreateAndAddModules {
                 let createBytes := add(0x40, add(data, i))
 
                 let output := mload(0x40)
-                if eq(delegatecall(gas, proxyFactory, createBytes, createBytesLength, output, 0x20), 0) { revert(0, 0) }
+                if eq(delegatecall(gas, proxyFactory, createBytes, createBytesLength, output, 0x20), 0) {revert(0, 0)}
                 module := and(mload(output), 0xffffffffffffffffffffffffffffffffffffffff)
 
-                // Data is always padded to 32 bytes
+            // Data is always padded to 32 bytes
                 i := add(i, add(0x20, mul(div(add(createBytesLength, 0x1f), 0x20), 0x20)))
             }
             this.enableModule(module);
         }
+    }
+    /// @dev Allows to create and add multiple module in one transaction.
+    function createAndAddModulesNoFactory(address proxyAddress)
+    public
+    {
+        require(proxyAddress != address(0), "INVALID_DATA: PROXY_ADDRESS");
+
+        Module module = Module(proxyAddress);
+        this.enableModule(module);
     }
 }
