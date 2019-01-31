@@ -21,7 +21,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
     address public oracleRegistry;
 
     //keccak256(
-    //    "EIP712Domain(address verifyingContract, string NAME, string VERSION)"
+    //    "EIP712Domain(address verifyingContract)"
     //);
     bytes32 public constant DOMAIN_SEPARATOR_TYPEHASH = 0x035aff83d86937d35b32e04f0ddc6ff469290eef2f1b692d8a815c89404d4749;
 
@@ -52,9 +52,9 @@ contract SubscriptionModule is Module, SignatureDecoder {
     public
     {
         setManager();
-        require(domainSeparator == 0, "INVALID_STATE: DOMAIN_SEPARATOR_SET");
+        require(domainSeparator == 0, "SubscriptionModule::setup: INVALID_STATE: DOMAIN_SEPARATOR_SET");
         domainSeparator = keccak256(abi.encode(DOMAIN_SEPARATOR_TYPEHASH, address(this)));
-        require(oracleRegistry == address(0), "INVALID_STATE: MKRDAO_FEED_SET");
+        require(oracleRegistry == address(0), "SubscriptionModule::setup: INVALID_STATE: MKRDAO_FEED_SET");
         oracleRegistry = _oracleRegistry;
     }
 
@@ -88,6 +88,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
     )
     public
     payable
+    returns (bool)
     {
         uint256 startGas = gasleft();
 
@@ -97,26 +98,27 @@ contract SubscriptionModule is Module, SignatureDecoder {
             meta
         );
 
-        require(gasleft() >= safeTxGas, "INVALID_DATA: WALLET_TX_GAS");
+        require(gasleft() >= safeTxGas, "SubscriptionModule::execSubscription: INVALID_DATA: WALLET_TX_GAS");
 
-        require(checkHash(keccak256(subHashData), signatures), "INVALID_DATA: SIGNATURES");
+        require(_checkHash(keccak256(subHashData), signatures), "SubscriptionModule::execSubscription: INVALID_DATA: SIGNATURES");
 
-        paySubscription(to, value, data, operation, keccak256(subHashData), meta);
+        _paySubscription(to, value, data, operation, keccak256(subHashData), meta);
 
         // We transfer the calculated tx costs to the refundReceiver to avoid sending it to intermediate contracts that have made calls
         if (gasPrice > 0) {
-            handleTxPayment(startGas, dataGas, gasPrice, gasToken, refundReceiver);
+            _handleTxPayment(startGas, dataGas, gasPrice, gasToken, refundReceiver);
         }
+        return true;
     }
 
-    function processMeta(
+    function _processMeta(
         bytes memory meta
     )
     internal
     view
     returns (uint256 conversionRate, uint256[4] memory outMeta)
     {
-        require(meta.length == 160, "INVALID_DATA: META_LENGTH");
+        require(meta.length == 160, "SubscriptionModule::_processMeta: INVALID_DATA: META_LENGTH");
         //5 slots
 
         uint256 oracle;
@@ -161,7 +163,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
         return (conversionRate, [period, offChainID, startDate, expire]);
     }
 
-    function paySubscription(
+    function _paySubscription(
         address to,
         uint256 value,
         bytes memory data,
@@ -174,16 +176,16 @@ contract SubscriptionModule is Module, SignatureDecoder {
         uint256 conversionRate;
         uint256[4] memory processedMetaData;
 
-        (conversionRate, processedMetaData) = processMeta(meta);
+        (conversionRate, processedMetaData) = _processMeta(meta);
 
-        bool processPayment = processSub(subHash, processedMetaData);
+        bool processPayment = _processSub(subHash, processedMetaData);
 
         if (processPayment) {
 
             //Oracle Registry address data is in slot1
             if (conversionRate != uint256(0)) {
 
-                require(value > 1.00 ether, "INVALID_FORMAT: DYNAMIC_PRICE_FORMAT");
+                require(value > 1.00 ether, "SubscriptionModule::_paySubscription: INVALID_FORMAT: DYNAMIC_PRICE_FORMAT");
 
                 uint256 payment = value.wdiv(conversionRate);
 
@@ -192,11 +194,11 @@ contract SubscriptionModule is Module, SignatureDecoder {
                 value = payment;
             }
 
-            require(manager.execTransactionFromModule(to, value, data, operation), "INVALID_EXEC: PAY_SUB");
+            require(manager.execTransactionFromModule(to, value, data, operation), "SubscriptionModule::_paySubscription: INVALID_EXEC: PAY_SUB");
         }
     }
 
-    function handleTxPayment(
+    function _handleTxPayment(
         uint256 gasUsed,
         uint256 dataGas,
         uint256 gasPrice,
@@ -210,16 +212,15 @@ contract SubscriptionModule is Module, SignatureDecoder {
         address receiver = refundReceiver == address(0) ? tx.origin : refundReceiver;
         if (gasToken == address(0)) {
             // solium-disable-next-line security/no-send
-            require(manager.execTransactionFromModule(receiver, amount, "0x", Enum.Operation.Call), "FAILED_EXEC: PAYMENT_ETH");
+            require(manager.execTransactionFromModule(receiver, amount, "0x", Enum.Operation.Call), "SubscriptionModule::_handleTxPayment: FAILED_EXEC: PAYMENT_ETH");
         } else {
             bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", receiver, amount);
             // solium-disable-next-line security/no-inline-assembly
-            require(manager.execTransactionFromModule(gasToken, 0, data, Enum.Operation.Call), "FAILED_EXEC: PAYMENT_GASTOKEN");
+            require(manager.execTransactionFromModule(gasToken, 0, data, Enum.Operation.Call), "SubscriptionModule::_handleTxPayment: FAILED_EXEC: PAYMENT_GASTOKEN");
         }
     }
 
-
-    function checkHash(
+    function _checkHash(
         bytes32 transactionHash,
         bytes memory signatures
     )
@@ -236,8 +237,8 @@ contract SubscriptionModule is Module, SignatureDecoder {
         valid = false;
         for (i = 0; i < threshold; i++) {
             currentOwner = recoverKey(transactionHash, signatures, i);
-            require(OwnerManager(address(manager)).isOwner(currentOwner), "INVALID_DATA: SIGNATURE_NOT_OWNER");
-            require(currentOwner > lastOwner, "INVALID_DATA: SIGNATURE_OUT_ORDER");
+            require(OwnerManager(address(manager)).isOwner(currentOwner), "SubscriptionModule::_checkHash: INVALID_DATA: SIGNATURE_NOT_OWNER");
+            require(currentOwner > lastOwner, "SubscriptionModule::_checkHash: INVALID_DATA: SIGNATURE_OUT_ORDER");
             lastOwner = currentOwner;
         }
         valid = true;
@@ -264,10 +265,10 @@ contract SubscriptionModule is Module, SignatureDecoder {
         } else if (sub.status == GEnum.SubscriptionStatus.VALID) {
             return true;
         } else if (sub.status == GEnum.SubscriptionStatus.EXPIRED) {
-            require(sub.endDate != 0, "INVALID_STATE: SUB_EXPIRES");
+            require(sub.endDate != 0, "SubscriptionModule::isValidSubscription: INVALID_STATE: SUB_EXPIRES");
             return (now <= sub.endDate);
         } else if (sub.status == GEnum.SubscriptionStatus.INIT) {
-            return checkHash(subscriptionHash, signatures);
+            return _checkHash(subscriptionHash, signatures);
         }
         return false;
     }
@@ -279,7 +280,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
     public
     returns (bool) {
         Meta storage sub = subscriptions[subHash];
-        require((sub.status != GEnum.SubscriptionStatus.CANCELLED) && (sub.status != GEnum.SubscriptionStatus.EXPIRED), "INVALID_STATE: SUB_STATUS");
+        require((sub.status != GEnum.SubscriptionStatus.CANCELLED) && (sub.status != GEnum.SubscriptionStatus.EXPIRED), "SubscriptionModule::cancelSubscription: INVALID_STATE: SUB_STATUS");
 
         sub.status = GEnum.SubscriptionStatus.CANCELLED;
         emit Cancelled(subHash);
@@ -305,7 +306,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
     public
     returns (bool)
     {
-        require(OwnerManager(address(manager)).isOwner(msg.sender), "INVALID_DATA: MSG_SENDER_NOT_OWNER");
+        require(OwnerManager(address(manager)).isOwner(msg.sender), "SubscriptionModule::cancelSubscriptionAsOwner: INVALID_DATA: MSG_SENDER_NOT_OWNER");
 
         bytes memory subHashData = encodeSubscriptionData(
             to, value, data, operation,
@@ -315,8 +316,8 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
         Meta storage sub = subscriptions[keccak256(subHashData)];
 
-        require((sub.status != GEnum.SubscriptionStatus.CANCELLED) && (sub.status != GEnum.SubscriptionStatus.EXPIRED), "INVALID_STATE: SUB_STATUS");
-        require(checkHash(keccak256(subHashData), signatures), "INVALID_DATA: SIGNATURES_INVALID");
+        require((sub.status != GEnum.SubscriptionStatus.CANCELLED) && (sub.status != GEnum.SubscriptionStatus.EXPIRED), "SubscriptionModule::cancelSubscriptionAsOwner: INVALID_STATE: SUB_STATUS");
+        require(_checkHash(keccak256(subHashData), signatures), "SubscriptionModule::cancelSubscriptionAsOwner: INVALID_DATA: SIGNATURES_INVALID");
 
         sub.status = GEnum.SubscriptionStatus.CANCELLED;
 
@@ -326,7 +327,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
     /// @dev used to help mitigate stack issues
     /// @return bool
-    function processSub(
+    function _processSub(
         bytes32 subHash,
         uint256[4] memory pmeta
     )
@@ -341,13 +342,13 @@ contract SubscriptionModule is Module, SignatureDecoder {
         uint256 withdrawHolder;
         Meta storage sub = subscriptions[subHash];
 
-        require((sub.status != GEnum.SubscriptionStatus.EXPIRED && sub.status != GEnum.SubscriptionStatus.CANCELLED), "INVALID_STATE: SUB_STATUS");
+        require((sub.status != GEnum.SubscriptionStatus.EXPIRED && sub.status != GEnum.SubscriptionStatus.CANCELLED), "SubscriptionModule::_processSub: INVALID_STATE: SUB_STATUS");
 
 
         if (sub.status == GEnum.SubscriptionStatus.INIT) {
 
             if (endDate != 0) {
-                require(endDate > now, "INVALID_DATA: SUB_EXPIRES");
+                require(endDate > now, "SubscriptionModule::_processSub: INVALID_DATA: SUB_ENDDATE");
                 sub.endDate = endDate;
             }
 
@@ -371,15 +372,15 @@ contract SubscriptionModule is Module, SignatureDecoder {
             }
 
         } else if (sub.status == GEnum.SubscriptionStatus.TRIAL) {
-            require(now >= startDate, "INVALID_STATE: SUB_STARTDATE");
+            require(now >= startDate, "SubscriptionModule::_processSub: INVALID_STATE: SUB_STARTDATE");
             sub.nextWithdraw = now;
             sub.status = GEnum.SubscriptionStatus.VALID;
             emit StatusChanged(GEnum.SubscriptionStatus.TRIAL, GEnum.SubscriptionStatus.VALID);
         }
 
-        require(sub.status == GEnum.SubscriptionStatus.VALID, "INVALID_STATE: SUB_STATUS");
+        require(sub.status == GEnum.SubscriptionStatus.VALID, "SubscriptionModule::_processSub: INVALID_STATE: SUB_STATUS");
 
-        require(now >= sub.nextWithdraw, "INVALID_STATE: SUB_NEXTWITHDRAW");
+        require(now >= sub.nextWithdraw, "SubscriptionModule::_processSub: INVALID_STATE: SUB_NEXTWITHDRAW");
 
         if (period == uint(GEnum.Period.DAY)) {
             withdrawHolder = BokkyPooBahsDateTimeLibrary.addDays(sub.nextWithdraw, 1);
@@ -505,18 +506,18 @@ contract SubscriptionModule is Module, SignatureDecoder {
     public
     returns (uint256)
     {
-        require(msg.sender == address(this), "INVALID_DATA: MSG_SENDER");
+        require(msg.sender == address(this), "SubscriptionModule::requiredTxGas: INVALID_DATA: MSG_SENDER");
 
         uint256 startGas = gasleft();
         // We don't provide an error message here, as we use it to return the estimate
         // solium-disable-next-line error-reason
 
-        (uint256 conversionRate, uint256[4] memory pMeta) = processMeta(meta);
+        (uint256 conversionRate, uint256[4] memory pMeta) = _processMeta(meta);
 
         //Oracle Registry address data is in slot1
         if (conversionRate != uint256(0)) {
 
-            require(value > 1.00 ether, "INVALID_FORMAT: DYNAMIC_PRICE_FORMAT");
+            require(value > 1.00 ether, "SubscriptionModule::requiredTxGas: INVALID_FORMAT: DYNAMIC_PRICE_FORMAT");
 
             uint256 payment = value.wdiv(conversionRate);
 
