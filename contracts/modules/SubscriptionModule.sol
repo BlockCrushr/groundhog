@@ -12,8 +12,8 @@ import "../OracleRegistry.sol";
 /// @author Andrew Redden - <andrew@groundhog.network>
 contract SubscriptionModule is Module, SignatureDecoder {
 
-    using BokkyPooBahsDateTimeLibrary for uint;
-    using DSMath for uint;
+    using BokkyPooBahsDateTimeLibrary for uint256;
+    using DSMath for uint256;
     string public constant NAME = "Groundhog";
     string public constant VERSION = "0.0.1";
 
@@ -30,6 +30,11 @@ contract SubscriptionModule is Module, SignatureDecoder {
     //)
     bytes32 public constant SAFE_SUB_TX_TYPEHASH = 0x4494907805e3ceba396741b2837174bdf548ec2cbe03f5448d7fa8f6b1aaf98e;
 
+    //keccak256(
+    //  "SafeSubCancelTx(bytes32 subscriptionHash,string action)"
+    //)
+    bytes32 public constant SAFE_SUB_CANCEL_TX_TYPEHASH = 0xef5a0c558cb538697e29722572248a2340a367e5079b08a00b35ef5dd1e66faa;
+
     mapping(bytes32 => Meta) public subscriptions;
 
     struct Meta {
@@ -39,22 +44,49 @@ contract SubscriptionModule is Module, SignatureDecoder {
         uint256 endDate;
     }
 
-    event PaymentFailed(bytes32 subscriptionHash);
-    event ProcessingFailed();
-    event DynamicPayment(uint256 dynPriceFormat, uint256 conversionRate, uint256 paymentTotal);
-    event Cancelled(bytes32 subHash);
-    event Processed(bytes32 subHash);
-    event StatusChanged(GEnum.SubscriptionStatus previous, GEnum.SubscriptionStatus next);
-    event LogUint(uint256);
+    event PaymentFailed(
+        bytes32 subscriptionHash
+    );
+    event DynamicPayment(
+        uint256 dynPriceFormat,
+        uint256 conversionRate,
+        uint256 paymentTotal
+    );
+    event Cancelled(
+        bytes32 subHash
+    );
+    event Processed(
+        bytes32 subHash
+    );
+    event StatusChanged(
+        GEnum.SubscriptionStatus previous,
+        GEnum.SubscriptionStatus next
+    );
 
     /// @dev Setup function sets manager
-    function setup(address _oracleRegistry)
+    function setup(
+        address _oracleRegistry
+    )
     public
     {
         setManager();
-        require(domainSeparator == 0, "SubscriptionModule::setup: INVALID_STATE: DOMAIN_SEPARATOR_SET");
-        domainSeparator = keccak256(abi.encode(DOMAIN_SEPARATOR_TYPEHASH, address(this)));
-        require(oracleRegistry == address(0), "SubscriptionModule::setup: INVALID_STATE: MKRDAO_FEED_SET");
+
+        require(
+            domainSeparator == 0,
+            "SubscriptionModule::setup: INVALID_STATE: DOMAIN_SEPARATOR_SET"
+        );
+
+        domainSeparator = keccak256(
+            abi.encode(
+                DOMAIN_SEPARATOR_TYPEHASH, address(this)
+            )
+        );
+
+        require(
+            oracleRegistry == address(0),
+            "SubscriptionModule::setup: INVALID_STATE: ORACLE_REGISTRY_SET"
+        );
+
         oracleRegistry = _oracleRegistry;
     }
 
@@ -70,7 +102,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
     /// @param gasToken Token address (or 0 if ETH) that is used for the payment.
     /// @param refundReceiver payout address or 0 if tx.origin
     /// @param meta Packed bytes data {address refundReceiver (required}, {uint256 period (required}, {uint256 offChainID (required}, {uint256 endDate (optional}
-    /// @param signatures Packed signature data ({bytes32 r}{bytes32 s}{uint8 v})
+    /// @param signatures Packed signature data ({bytes32 r}{bytes32 s}{uint2568 v})
     /// @return success boolean value of execution
 
     function execSubscription(
@@ -87,27 +119,38 @@ contract SubscriptionModule is Module, SignatureDecoder {
         bytes memory signatures
     )
     public
-    payable
-    returns (bool)
+    returns (
+        bool
+    )
     {
         uint256 startGas = gasleft();
 
         bytes memory subHashData = encodeSubscriptionData(
             to, value, data, operation, // Transaction info
-            safeTxGas, dataGas, gasPrice, gasToken, refundReceiver,
-            meta
+            safeTxGas, dataGas, gasPrice, gasToken,
+            refundReceiver, meta
         );
 
-        require(gasleft() >= safeTxGas, "SubscriptionModule::execSubscription: INVALID_DATA: WALLET_TX_GAS");
+        require(
+            gasleft() >= safeTxGas,
+            "SubscriptionModule::execSubscription: INVALID_DATA: WALLET_TX_GAS"
+        );
 
-        require(_checkHash(keccak256(subHashData), signatures), "SubscriptionModule::execSubscription: INVALID_DATA: SIGNATURES");
+        require(
+            _checkHash(keccak256(subHashData), signatures),
+            "SubscriptionModule::execSubscription: INVALID_DATA: SIGNATURES"
+        );
 
-        _paySubscription(to, value, data, operation, keccak256(subHashData), meta);
+        _paySubscription(
+            to, value, data, operation,
+            keccak256(subHashData), meta
+        );
 
         // We transfer the calculated tx costs to the refundReceiver to avoid sending it to intermediate contracts that have made calls
         if (gasPrice > 0) {
             _handleTxPayment(startGas, dataGas, gasPrice, gasToken, refundReceiver);
         }
+
         return true;
     }
 
@@ -116,51 +159,37 @@ contract SubscriptionModule is Module, SignatureDecoder {
     )
     internal
     view
-    returns (uint256 conversionRate, uint256[4] memory outMeta)
+    returns (
+        uint256 conversionRate,
+        uint256[4] memory outMeta
+    )
     {
-        require(meta.length == 160, "SubscriptionModule::_processMeta: INVALID_DATA: META_LENGTH");
-        //5 slots
+        require(
+            meta.length == 160,
+            "SubscriptionModule::_processMeta: INVALID_DATA: META_LENGTH"
+        );
 
-        uint256 oracle;
-        //slot1
-        uint256 period;
-        //slot2
-        uint256 offChainID;
-        //slot3
-        uint256 startDate;
-        //slot4
-        uint256 expire;
-        //slot5
 
-        // solium-disable-next-line security/no-inline-assembly
-        assembly {
-            oracle := mload(add(meta, add(0x20, 0)))
-        }
-        // solium-disable-next-line security/no-inline-assembly
-        assembly {
-            period := mload(add(meta, add(0x20, 32)))
-        }
-        // solium-disable-next-line security/no-inline-assembly
-        assembly {
-            offChainID := mload(add(meta, add(0x20, 64)))
-        }
-        // solium-disable-next-line security/no-inline-assembly
-        assembly {
-            startDate := mload(add(meta, add(0x20, 96)))
-        }
-        // solium-disable-next-line security/no-inline-assembly
-        assembly {
-            expire := mload(add(meta, add(0x20, 128)))
-        }
+        (
+        uint256 oracle,
+        uint256 period,
+        uint256 offChainID,
+        uint256 startDate,
+        uint256 endDate
+        ) = abi.decode(
+            meta,
+            (uint, uint, uint, uint, uint) //5 slots
+        );
 
         if (oracle != uint256(0)) {
+
             bytes32 rate = OracleRegistry(oracleRegistry).read(oracle);
             conversionRate = uint256(rate);
         } else {
             conversionRate = uint256(0);
         }
 
-        return (conversionRate, [period, offChainID, startDate, expire]);
+        return (conversionRate, [period, offChainID, startDate, endDate]);
     }
 
     function _paySubscription(
@@ -185,16 +214,26 @@ contract SubscriptionModule is Module, SignatureDecoder {
             //Oracle Registry address data is in slot1
             if (conversionRate != uint256(0)) {
 
-                require(value > 1.00 ether, "SubscriptionModule::_paySubscription: INVALID_FORMAT: DYNAMIC_PRICE_FORMAT");
+                //when in priceFeed format, price feeds are denominated in Ether but converted to the feed pairing
+                //ETHUSD, WBTC/USD
+                require(
+                    value > 1.00 ether,
+                    "SubscriptionModule::_paySubscription: INVALID_FORMAT: DYNAMIC_PRICE_FORMAT"
+                );
 
                 uint256 payment = value.wdiv(conversionRate);
 
-                emit DynamicPayment(value, conversionRate, payment);
+                emit DynamicPayment(
+                    value, conversionRate, payment
+                );
 
                 value = payment;
             }
 
-            require(manager.execTransactionFromModule(to, value, data, operation), "SubscriptionModule::_paySubscription: INVALID_EXEC: PAY_SUB");
+            require(
+                manager.execTransactionFromModule(to, value, data, operation),
+                "SubscriptionModule::_paySubscription: INVALID_EXEC: PAY_SUB"
+            );
         }
     }
 
@@ -210,23 +249,34 @@ contract SubscriptionModule is Module, SignatureDecoder {
         uint256 amount = gasUsed.sub(gasleft()).add(dataGas).mul(gasPrice);
         // solium-disable-next-line security/no-tx-origin
         address receiver = refundReceiver == address(0) ? tx.origin : refundReceiver;
+
         if (gasToken == address(0)) {
+
             // solium-disable-next-line security/no-send
-            require(manager.execTransactionFromModule(receiver, amount, "0x", Enum.Operation.Call), "SubscriptionModule::_handleTxPayment: FAILED_EXEC: PAYMENT_ETH");
+            require(
+                manager.execTransactionFromModule(receiver, amount, "0x", Enum.Operation.Call),
+                "SubscriptionModule::_handleTxPayment: FAILED_EXEC: PAYMENT_ETH"
+            );
         } else {
+
             bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", receiver, amount);
             // solium-disable-next-line security/no-inline-assembly
-            require(manager.execTransactionFromModule(gasToken, 0, data, Enum.Operation.Call), "SubscriptionModule::_handleTxPayment: FAILED_EXEC: PAYMENT_GASTOKEN");
+            require(
+                manager.execTransactionFromModule(gasToken, 0, data, Enum.Operation.Call),
+                "SubscriptionModule::_handleTxPayment: FAILED_EXEC: PAYMENT_GAS_TOKEN"
+            );
         }
     }
 
     function _checkHash(
-        bytes32 transactionHash,
+        bytes32 hash,
         bytes memory signatures
     )
     internal
     view
-    returns (bool valid)
+    returns (
+        bool valid
+    )
     {
         // There cannot be an owner with address 0.
         address lastOwner = address(0);
@@ -235,12 +285,27 @@ contract SubscriptionModule is Module, SignatureDecoder {
         uint256 threshold = OwnerManager(address(manager)).getThreshold();
         // Validate threshold is reached.
         valid = false;
+
         for (i = 0; i < threshold; i++) {
-            currentOwner = recoverKey(transactionHash, signatures, i);
-            require(OwnerManager(address(manager)).isOwner(currentOwner), "SubscriptionModule::_checkHash: INVALID_DATA: SIGNATURE_NOT_OWNER");
-            require(currentOwner > lastOwner, "SubscriptionModule::_checkHash: INVALID_DATA: SIGNATURE_OUT_ORDER");
+
+            currentOwner = recoverKey(
+                hash,
+                signatures, i
+            );
+
+            require(
+                OwnerManager(address(manager)).isOwner(currentOwner),
+                "SubscriptionModule::_checkHash: INVALID_DATA: SIGNATURE_NOT_OWNER"
+            );
+
+            require(
+                currentOwner > lastOwner,
+                "SubscriptionModule::_checkHash: INVALID_DATA: SIGNATURE_OUT_ORDER"
+            );
+
             lastOwner = currentOwner;
         }
+
         valid = true;
     }
 
@@ -261,94 +326,131 @@ contract SubscriptionModule is Module, SignatureDecoder {
         Meta storage sub = subscriptions[subscriptionHash];
 
         if (sub.status == GEnum.SubscriptionStatus.TRIAL && sub.nextWithdraw <= now) {
+
             return true;
         } else if (sub.status == GEnum.SubscriptionStatus.VALID) {
+
             return true;
-        } else if (sub.status == GEnum.SubscriptionStatus.EXPIRED) {
-            require(sub.endDate != 0, "SubscriptionModule::isValidSubscription: INVALID_STATE: SUB_EXPIRES");
+        } else if (sub.status == GEnum.SubscriptionStatus.EXPIRED || sub.status == GEnum.SubscriptionStatus.CANCELLED) {
+
+            require(
+                sub.endDate != 0,
+                "SubscriptionModule::isValidSubscription: INVALID_STATE: SUB_EXPIRES"
+            );
+
             return (now <= sub.endDate);
         } else if (sub.status == GEnum.SubscriptionStatus.INIT) {
-            return _checkHash(subscriptionHash, signatures);
+
+            return _checkHash(
+                subscriptionHash,
+                signatures
+            );
         }
+
         return false;
     }
 
-    function cancelSubscription(
-        bytes32 subHash
+    function cancelSubscriptionAsManager(
+        bytes32 subscriptionHash
     )
     authorized
     public
     returns (bool) {
-        Meta storage sub = subscriptions[subHash];
-        require((sub.status != GEnum.SubscriptionStatus.CANCELLED) && (sub.status != GEnum.SubscriptionStatus.EXPIRED), "SubscriptionModule::cancelSubscription: INVALID_STATE: SUB_STATUS");
+        Meta storage sub = subscriptions[subscriptionHash];
+
+        require(
+            (sub.status != GEnum.SubscriptionStatus.CANCELLED) && (sub.status != GEnum.SubscriptionStatus.EXPIRED),
+            "SubscriptionModule::cancelSubscriptionAsManager: INVALID_STATE: SUB_STATUS"
+        );
+
+        if (sub.status != GEnum.SubscriptionStatus.INIT) {
+            sub.endDate = sub.nextWithdraw;
+        }
+
+        emit StatusChanged(
+            sub.status, GEnum.SubscriptionStatus.CANCELLED
+        );
 
         sub.status = GEnum.SubscriptionStatus.CANCELLED;
-        emit Cancelled(subHash);
+        sub.nextWithdraw = 0;
+
+        emit Cancelled(
+            subscriptionHash
+        );
         return true;
     }
 
-    /// @dev Allows to execute a Safe transaction confirmed by required number of owners and then pays the account that submitted the transaction.
-    ///      Note: The fees are always transferred, even if the user transaction fails.
+    /// @dev Allows to execute a Safe transaction confirmed by required number of owners and then pays the account that
+    /// submitted the transaction.
     /// @return bool hash of on sub to revoke or cancel
-    function cancelSubscriptionAsOwner(
-        address to,
-        uint256 value,
-        bytes memory data,
-        Enum.Operation operation,
-        uint256 safeTxGas,
-        uint256 dataGas,
-        uint256 gasPrice,
-        address gasToken,
-        address refundReceiver,
-        bytes memory meta,
+    function cancelSubscription(
+        bytes32 subscriptionHash,
         bytes memory signatures
     )
     public
     returns (bool)
     {
-        require(OwnerManager(address(manager)).isOwner(msg.sender), "SubscriptionModule::cancelSubscriptionAsOwner: INVALID_DATA: MSG_SENDER_NOT_OWNER");
 
-        bytes memory subHashData = encodeSubscriptionData(
-            to, value, data, operation,
-            safeTxGas, dataGas, gasPrice, gasToken, refundReceiver,
-            meta
+        Meta storage sub = subscriptions[subscriptionHash];
+
+
+        require(
+            (sub.status != GEnum.SubscriptionStatus.CANCELLED && sub.status != GEnum.SubscriptionStatus.EXPIRED),
+            "SubscriptionModule::cancelSubscription: INVALID_STATE: SUB_STATUS"
         );
 
-        Meta storage sub = subscriptions[keccak256(subHashData)];
+        bytes32 cancelHash = getSubscriptionCancelHash(subscriptionHash);
 
-        require((sub.status != GEnum.SubscriptionStatus.CANCELLED) && (sub.status != GEnum.SubscriptionStatus.EXPIRED), "SubscriptionModule::cancelSubscriptionAsOwner: INVALID_STATE: SUB_STATUS");
-        require(_checkHash(keccak256(subHashData), signatures), "SubscriptionModule::cancelSubscriptionAsOwner: INVALID_DATA: SIGNATURES_INVALID");
+        require(
+            _checkHash(cancelHash, signatures),
+            "SubscriptionModule::cancelSubscription: INVALID_DATA: SIGNATURES_INVALID"
+        );
 
         sub.status = GEnum.SubscriptionStatus.CANCELLED;
 
-        emit Cancelled(keccak256(subHashData));
+        if (sub.status != GEnum.SubscriptionStatus.INIT) {
+            sub.endDate = sub.nextWithdraw;
+        }
+
+        sub.nextWithdraw = 0;
+
+        emit Cancelled(
+            subscriptionHash
+        );
+
         return true;
     }
 
     /// @dev used to help mitigate stack issues
     /// @return bool
     function _processSub(
-        bytes32 subHash,
-        uint256[4] memory pmeta
+        bytes32 subscriptionHash,
+        uint256[4] memory processedMeta
     )
     internal
     returns (bool)
     {
-        uint256 period = pmeta[0];
-        uint256 offChainID = pmeta[1];
-        uint256 startDate = pmeta[2];
-        uint256 endDate = pmeta[3];
+        uint256 period = processedMeta[0];
+        uint256 offChainID = processedMeta[1];
+        uint256 startDate = processedMeta[2];
+        uint256 endDate = processedMeta[3];
 
         uint256 withdrawHolder;
-        Meta storage sub = subscriptions[subHash];
+        Meta storage sub = subscriptions[subscriptionHash];
 
-        require((sub.status != GEnum.SubscriptionStatus.EXPIRED && sub.status != GEnum.SubscriptionStatus.CANCELLED), "SubscriptionModule::_processSub: INVALID_STATE: SUB_STATUS");
+        require(
+            (sub.status != GEnum.SubscriptionStatus.EXPIRED && sub.status != GEnum.SubscriptionStatus.CANCELLED),
+            "SubscriptionModule::_processSub: INVALID_STATE: SUB_STATUS"
+        );
 
 
         if (sub.status == GEnum.SubscriptionStatus.INIT) {
 
             if (endDate != 0) {
-                require(endDate > now, "SubscriptionModule::_processSub: INVALID_DATA: SUB_ENDDATE");
+                require(
+                    endDate > now,
+                    "SubscriptionModule::_processSub: INVALID_DATA: SUB_END_DATE"
+                );
                 sub.endDate = endDate;
             }
 
@@ -357,53 +459,72 @@ contract SubscriptionModule is Module, SignatureDecoder {
             }
 
             if (startDate != 0) {
-//                require(startDate > now, "INVALID_DATA: SUB_STARTDATE");
-
-                emit LogUint(startDate);
-                emit LogUint(now);
+                require(
+                    startDate >= now,
+                    "SubscriptionModule::_processSub: INVALID_DATA: SUB_START_DATE"
+                );
                 sub.nextWithdraw = startDate;
                 sub.status = GEnum.SubscriptionStatus.TRIAL;
-                emit StatusChanged(GEnum.SubscriptionStatus.INIT, GEnum.SubscriptionStatus.TRIAL);
+                emit StatusChanged(
+                    GEnum.SubscriptionStatus.INIT,
+                    GEnum.SubscriptionStatus.TRIAL
+                );
                 return false;
             } else {
                 sub.nextWithdraw = now;
                 sub.status = GEnum.SubscriptionStatus.VALID;
-                emit StatusChanged(GEnum.SubscriptionStatus.INIT, GEnum.SubscriptionStatus.VALID);
+                emit StatusChanged(
+                    GEnum.SubscriptionStatus.INIT,
+                    GEnum.SubscriptionStatus.VALID
+                );
             }
 
         } else if (sub.status == GEnum.SubscriptionStatus.TRIAL) {
-            require(now >= startDate, "SubscriptionModule::_processSub: INVALID_STATE: SUB_STARTDATE");
+            require(
+                now >= startDate,
+                "SubscriptionModule::_processSub: INVALID_STATE: SUB_START_DATE"
+            );
             sub.nextWithdraw = now;
             sub.status = GEnum.SubscriptionStatus.VALID;
-            emit StatusChanged(GEnum.SubscriptionStatus.TRIAL, GEnum.SubscriptionStatus.VALID);
+            emit StatusChanged(
+                GEnum.SubscriptionStatus.TRIAL,
+                GEnum.SubscriptionStatus.VALID
+            );
         }
 
-        require(sub.status == GEnum.SubscriptionStatus.VALID, "SubscriptionModule::_processSub: INVALID_STATE: SUB_STATUS");
+        require(
+            sub.status == GEnum.SubscriptionStatus.VALID,
+            "SubscriptionModule::_processSub: INVALID_STATE: SUB_STATUS"
+        );
 
-        require(now >= sub.nextWithdraw, "SubscriptionModule::_processSub: INVALID_STATE: SUB_NEXTWITHDRAW");
+        require(
+            now >= sub.nextWithdraw && sub.nextWithdraw != 0,
+            "SubscriptionModule::_processSub: INVALID_STATE: SUB_NEXT_WITHDRAW"
+        );
 
-        if (period == uint(GEnum.Period.DAY)) {
+        if (period == uint256(GEnum.Period.DAY)) {
             withdrawHolder = BokkyPooBahsDateTimeLibrary.addDays(sub.nextWithdraw, 1);
-        } else if (period == uint(GEnum.Period.WEEK)) {
+        } else if (period == uint256(GEnum.Period.WEEK)) {
             withdrawHolder = BokkyPooBahsDateTimeLibrary.addDays(sub.nextWithdraw, 7);
-        } else if (period == uint(GEnum.Period.MONTH)) {
+        } else if (period == uint256(GEnum.Period.MONTH)) {
             withdrawHolder = BokkyPooBahsDateTimeLibrary.addMonths(sub.nextWithdraw, 1);
         } else {
-            revert(string(abi.encodePacked(period)));
+            revert("SubscriptionModule::_processSub: INVALID_DATA: PERIOD");
         }
 
         //if a subscription is expiring and its next withdraw timeline is beyond hte time of the expiration
         //modify the status
         if (sub.endDate != 0 && withdrawHolder > sub.endDate) {
             sub.nextWithdraw = 0;
-            emit StatusChanged(sub.status, GEnum.SubscriptionStatus.EXPIRED);
+            emit StatusChanged(
+                sub.status, GEnum.SubscriptionStatus.EXPIRED
+            );
             sub.status = GEnum.SubscriptionStatus.EXPIRED;
         } else {
             sub.nextWithdraw = withdrawHolder;
         }
 
-
-        emit Processed(subHash);
+        emit Processed(subscriptionHash);
         return true;
     }
 
@@ -419,7 +540,13 @@ contract SubscriptionModule is Module, SignatureDecoder {
     pure
     returns (bytes memory)
     {
-        return abi.encodePacked(oracle, period, offChainID, startDate, endDate);
+        return abi.encodePacked(
+            oracle,
+            period,
+            offChainID,
+            startDate,
+            endDate
+        );
     }
 
     /// @dev Returns hash to be signed by owners.
@@ -449,7 +576,47 @@ contract SubscriptionModule is Module, SignatureDecoder {
     view
     returns (bytes32)
     {
-        return keccak256(encodeSubscriptionData(to, value, data, operation, safeTxGas, dataGas, gasPrice, gasToken, refundReceiver, meta));
+        return keccak256(
+            encodeSubscriptionData(
+                to,
+                value,
+                data,
+                operation,
+                safeTxGas,
+                dataGas,
+                gasPrice,
+                gasToken,
+                refundReceiver,
+                meta
+            )
+        );
+    }
+
+    /// @dev Returns hash to be signed by owners for cancelling a subscription
+    function getSubscriptionCancelHash(
+        bytes32 subscriptionHash
+    )
+    public
+    view
+    returns (bytes32)
+    {
+
+        bytes32 safeSubCancelTxHash = keccak256(
+            abi.encode(
+                SAFE_SUB_CANCEL_TX_TYPEHASH,
+                subscriptionHash,
+                keccak256("cancel")
+            )
+        );
+
+        return keccak256(
+            abi.encodePacked(
+                byte(0x19),
+                byte(0x01),
+                domainSeparator,
+                safeSubCancelTxHash
+            )
+        );
     }
 
 
@@ -479,9 +646,27 @@ contract SubscriptionModule is Module, SignatureDecoder {
     returns (bytes memory)
     {
         bytes32 safeSubTxHash = keccak256(
-            abi.encode(SAFE_SUB_TX_TYPEHASH, to, value, keccak256(data), operation, safeTxGas, dataGas, gasPrice, gasToken, refundReceiver, keccak256(meta))
+            abi.encode(
+                SAFE_SUB_TX_TYPEHASH,
+                to,
+                value,
+                keccak256(data),
+                operation,
+                safeTxGas,
+                dataGas,
+                gasPrice,
+                gasToken,
+                refundReceiver,
+                keccak256(meta)
+            )
         );
-        return abi.encodePacked(byte(0x19), byte(0x01), domainSeparator, safeSubTxHash);
+
+        return abi.encodePacked(
+            byte(0x19),
+            byte(0x01),
+            domainSeparator,
+            safeSubTxHash
+        );
     }
 
     /// @dev Allows to estimate a Safe transaction.
@@ -506,7 +691,11 @@ contract SubscriptionModule is Module, SignatureDecoder {
     public
     returns (uint256)
     {
-        require(msg.sender == address(this), "SubscriptionModule::requiredTxGas: INVALID_DATA: MSG_SENDER");
+        require(
+            msg.sender == address(this),
+            "SubscriptionModule::requiredTxGas: INVALID_DATA: MSG_SENDER"
+
+        );
 
         uint256 startGas = gasleft();
         // We don't provide an error message here, as we use it to return the estimate
@@ -517,7 +706,10 @@ contract SubscriptionModule is Module, SignatureDecoder {
         //Oracle Registry address data is in slot1
         if (conversionRate != uint256(0)) {
 
-            require(value > 1.00 ether, "SubscriptionModule::requiredTxGas: INVALID_FORMAT: DYNAMIC_PRICE_FORMAT");
+            require(
+                value > 1.00 ether,
+                "SubscriptionModule::requiredTxGas: INVALID_FORMAT: DYNAMIC_PRICE_FORMAT"
+            );
 
             uint256 payment = value.wdiv(conversionRate);
 
@@ -526,7 +718,10 @@ contract SubscriptionModule is Module, SignatureDecoder {
             value = payment;
         }
 
-        require(manager.execTransactionFromModule(to, value, data, operation));
+        require(
+            manager.execTransactionFromModule(to, value, data, operation),
+            "SubscriptionModule::requiredTxGas: INVALID_EXEC: SUB_PAY"
+        );
 
         uint256 requiredGas = startGas.sub(gasleft());
         // Convert response to string and return via error message

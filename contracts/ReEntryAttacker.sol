@@ -48,7 +48,7 @@ contract ReEntryAttacker {
     )
     public
     {
-        bytes32 activeAttack = SubscriptionModule(subModule)
+        bytes32 _activeAttack = SubscriptionModule(subModule)
         .getSubscriptionHash(
             to,
             value,
@@ -62,7 +62,7 @@ contract ReEntryAttacker {
             meta
         );
 
-        payloads[activeAttack] = Payload(
+        payloads[_activeAttack] = Payload(
             to,
             value,
             data,
@@ -96,21 +96,21 @@ contract ReEntryAttacker {
     external
     payable {
 
-        Payload storage attack = payloads[activeAttack];
+        Payload storage _attack = payloads[activeAttack];
 
         SubscriptionModule(subModule)
         .execSubscription(
-            attack.to,
-            attack.value,
-            attack.data,
-            attack.operation,
-            attack.safeTxGas,
-            attack.dataGas,
-            attack.gasPrice,
-            attack.gasToken,
-            attack.refundReceiver,
-            attack.meta,
-            attack.signatures
+            _attack.to,
+            _attack.value,
+            _attack.data,
+            _attack.operation,
+            _attack.safeTxGas,
+            _attack.dataGas,
+            _attack.gasPrice,
+            _attack.gasToken,
+            _attack.refundReceiver,
+            _attack.meta,
+            _attack.signatures
         );
     }
 }

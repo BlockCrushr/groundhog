@@ -5,14 +5,27 @@ import "./DSFeed.sol";
 
 contract OracleRegistry is Ownable {
 
+
+    address payable private _networkWallet;
+    address private _networkExecutor;
+
+    // TODO: set this to 0.005 ETH as WEI, bytes32 encoded
+    uint256 public baseFee = uint256(0x0000000000000000000000000000000000000000000000064eec68b56444c000);
+
     mapping(address => bool) public isWhitelisted;
     mapping(uint256 => address) public oracles;
+    mapping(address => mapping(address => uint256)) public splitterToFee;
+
 
     event OracleActivated(address, uint256);
 
     /// @dev Setup function sets initial storage of contract.
     /// @param _oracles List of whitelisted oracles.
-    function setup(address[] memory _oracles, uint256[] memory _currencyPair)
+    function setup(
+        address[] memory _oracles,
+        uint256[] memory _currencyPair,
+        address payable[] memory _networkSettings
+    )
     public
     onlyOwner
     {
@@ -21,12 +34,22 @@ contract OracleRegistry is Ownable {
         for (uint256 i = 0; i < _oracles.length; i++) {
             address oracle = _oracles[i];
             uint256 cp = _currencyPair[i];
-            require(oracle != address(0), "INVALID_DATA:ORACLE_ADDRESS");
-            require(cp != uint256(0), "INVALID_DATA:ORACLE_CURRENCY_PAIR");
+            require(oracle != address(0), "OracleResigstry::setup INVALID_DATA: ORACLE_ADDRESS");
+            require(cp != uint256(0), "OracleResigstry::setup INVALID_DATA: ORACLE_CURRENCY_PAIR");
             oracles[cp] = oracle;
             isWhitelisted[oracle] = true;
             emit OracleActivated(oracle, cp);
         }
+
+        require(_networkSettings.length == 2, "OracleResigstry::setup INVALID_DATA: NETWORK_SETTINGS_LENGTH");
+
+        require(_networkWallet == address(0), "OracleResigstry::setup INVALID_STATE: NETWORK_WALLET_SET");
+
+        _networkWallet = _networkSettings[0];
+
+        require(_networkExecutor == address(0), "OracleResigstry::setup INVALID_STATE: NETWORK_EXECUTOR_SET");
+
+        _networkExecutor = _networkSettings[1];
     }
 
     function read(uint256 currencyPair) public view returns (bytes32) {
@@ -55,4 +78,24 @@ contract OracleRegistry is Ownable {
         require(isWhitelisted[oracle], "Address is not whitelisted");
         isWhitelisted[oracle] = false;
     }
+
+    function getNetworkExecutor()
+    public
+    returns (address) {
+        return _networkExecutor;
+    }
+
+    function getNetworkWallet()
+    public
+    returns (address payable) {
+        return _networkWallet;
+    }
+
+    function getNetworkFee(address asset)
+    public
+    returns (uint256) {
+        //return splitterToFee[msg.sender][asset];
+        return baseFee;
+    }
+
 }

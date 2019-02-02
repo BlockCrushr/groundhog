@@ -5,11 +5,10 @@ pragma solidity ^0.5.0;
 contract GEnum {
     enum SubscriptionStatus {
         INIT,
+        TRIAL,
         VALID,
         CANCELLED,
-        EXPIRED,
-        PAYMENT_FAILED,
-        TRIAL
+        EXPIRED
     }
 
     enum Period {

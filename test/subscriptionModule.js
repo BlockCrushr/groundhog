@@ -69,7 +69,7 @@ contract('SubscriptionModule', async (accounts) => {
                 EIP712Domain: [
                     {type: "address", name: "verifyingContract"}
                 ],
-                // "SafeSubTx(address to,uint256 value,bytes data,uint8 operation,uint256 safeTxGas,uint256 dataGas,uint256 gasPrice,address gasToken, address refundReceiver, bytes meta)"
+                // "SafeSubTx(address to,uint256 value,bytes data,uint8 operation,uint256 safeTxGas,uint256 dataGas,uint256 gasPrice,address gasToken,address refundReceiver,bytes meta)"
                 SafeSubTx: [
                     {type: "address", name: "to"},
                     {type: "uint256", name: "value"},
@@ -98,6 +98,39 @@ contract('SubscriptionModule', async (accounts) => {
                 gasToken: txGasToken,
                 refundReceiver: refundReceiver,
                 meta: meta
+            }
+        };
+
+        let signatureBytes = "0x";
+        confirmingAccounts.sort();
+        for (let i = 0; i < confirmingAccounts.length; i++) {
+            signatureBytes += (await signTypedData(confirmingAccounts[i], typedData)).replace('0x', '')
+        }
+        return signatureBytes
+    }
+
+    let cancelSigner = async (
+        confirmingAccounts,
+        subscriptionHash
+    ) => {
+        let typedData = {
+            types: {
+                EIP712Domain: [
+                    {type: "address", name: "verifyingContract"}
+                ],
+                //"SafeSubCancelTx(bytes32 subscriptionHash, string action)"
+                SafeSubCancelTx: [
+                    {type: "bytes32", name: "subscriptionHash"},
+                    {type: "string", name: "action"},
+                ]
+            },
+            domain: {
+                verifyingContract: subscriptionModule.options.address
+            },
+            primaryType: "SafeSubCancelTx",
+            message: {
+                subscriptionHash: subscriptionHash,
+                action: "cancel"
             }
         };
 
@@ -329,7 +362,8 @@ contract('SubscriptionModule', async (accounts) => {
 
         tx = await oracleRegistry.methods.setup(
             [ethusdOracle.options.address],
-            [web3.utils.fromAscii('ethusd')]
+            [web3.utils.fromAscii('ethusd')],
+            [ethusdOracle.options.address, ethusdOracle.options.address]
         ).send({
             from: accounts[0],
             gasLimit: 8000000
@@ -369,7 +403,6 @@ contract('SubscriptionModule', async (accounts) => {
             PayingProxy.bytecode
         );
 
-        console.log(`    Create2 address: ${create2Address}`);
         await web3.eth.sendTransaction({
             from: accounts[0],
             to: create2Address,
@@ -377,15 +410,11 @@ contract('SubscriptionModule', async (accounts) => {
         });
 
         gnosisSafe = await utils.getParamFromTxEvent(
-            await proxyFactory.methods.createPayingProxy(
-                salt,
+            await proxyFactory.methods.createProxy(
                 gnosisSafeMasterCopy.options.address,
-                gnosisSafeData,
-                accounts[0],
-                "0x0000000000000000000000000000000000000000",
-                web3.utils.toWei('0.005', 'ether')
+                gnosisSafeData
             ).send({from: accounts[0], gasLimit: 8000000}),
-            'PayingProxyCreation',
+            'ProxyCreation',
             'proxy',
             proxyFactory.options.address,
             'GnosisSafe',
@@ -394,12 +423,84 @@ contract('SubscriptionModule', async (accounts) => {
         );
 
 
-        // gnosisSafe = await getInstance("GnosisSafe", {deployedAddress: '0xc70cA47Bc87264Fcda37870776544E41C73043D7'})
+        // gnosisSafe = await getInstance("GnosisSafe", {deployedAddress: '0x716F028c353e2790Fed210E68eB90e2572fC69DA'})
 
         let modules = await gnosisSafe.methods.getModules().call()
         subscriptionModule = await getInstance('SubscriptionModule', {deployedAddress: modules[0]})
         assert.equal(await subscriptionModule.methods.manager().call(), gnosisSafe.options.address)
     })
+
+
+    it('should deposit 1.1 ETH, create a $50 USD subscription, and then cancel the subscription before it even gets activated with meta txn workflow', async () => {
+        // Deposit 1 ETH + some spare money for execution
+        assert.equal(await web3.eth.getBalance(gnosisSafe.options.address), 0)
+        await web3.eth.sendTransaction({
+            from: receiver,
+            to: gnosisSafe.options.address,
+            value: web3.utils.toWei('1.1', 'ether')
+        })
+        assert.equal(await web3.eth.getBalance(gnosisSafe.options.address), web3.utils.toWei('1.1', 'ether'))
+
+        let confirmingAccounts = [accounts[0]];
+        let subSig = await signer(
+            confirmingAccounts,
+            receiver,
+            web3.utils.toWei('50', 'ether'),
+            "0x",
+            CALL,
+            0,
+            0,
+            0,
+            "0x0000000000000000000000000000000000000000",
+            executor,
+            await subscriptionModule.methods.getSubscriptionMetaBytes(web3.utils.fromAscii('ethusd'), 1, 1, 0, 0).call()
+        );
+
+        let gnosisSafeNonce = await gnosisSafe.methods.nonce().call();
+
+        let subscriptionHash = await subscriptionModule.methods.getSubscriptionHash(
+            receiver,
+            web3.utils.toWei('50', 'ether'),
+            "0x",
+            CALL,
+            0,
+            0,
+            0,
+            "0x0000000000000000000000000000000000000000",
+            executor,
+            await subscriptionModule.methods.getSubscriptionMetaBytes(web3.utils.fromAscii('ethusd'), 1, 1, 0, 0).call()
+        ).call();
+
+        let cancelSigs = await cancelSigner(
+            confirmingAccounts,
+            subscriptionHash
+        );
+
+        await subscriptionModule.methods.cancelSubscription(
+            subscriptionHash,
+            cancelSigs
+        ).send({from: accounts[0], gasLimit: 8000000});
+
+        await utils.shouldFailWithMessage(
+            subscriptionModule.methods.execSubscription(
+                receiver,
+                web3.utils.toWei('50', 'ether'),
+                "0x",
+                CALL,
+                0,
+                0,
+                0,
+                "0x0000000000000000000000000000000000000000",
+                executor,
+                await subscriptionModule.methods.getSubscriptionMetaBytes(web3.utils.fromAscii('ethusd'), 1, 1, 0, 0).call(),
+                subSig
+            ).send({
+                from: executor,
+                gasLimit: 8000000
+            }),
+            "INVALID_STATE: SUB_STATUS"
+        );
+    });
 
     // it('should deposit 1.1 ETH, and create a $50 USD subscription', async () => {
     //     // assert.equal(await web3.eth.getBalance(gnosisSafe.options.address), 0)
@@ -423,13 +524,13 @@ contract('SubscriptionModule', async (accounts) => {
     //         executor,
     //         {
     //             meta: {
-    //                 oracle: web3.utils.fromAscii('ethusd'), //oracle
+    //                 oracle: 0, //oracle
     //                 period: 1, //period
     //                 offChainID: 1, //
     //                 startDate: 1548806400,
     //                 endDate: 1551312000
     //             }
-
+    //
     //
     //         }
     //     );
@@ -493,71 +594,8 @@ contract('SubscriptionModule', async (accounts) => {
     //     // assert.equal(balanceBefore - await web3.eth.getBalance(gnosisSafe.options.address), await web3.utils.toWei('0.005', 'ether'))
     // })
 
-    it('should deposit 1.1 ETH, create a $50 USD subscription, and then cancel the subscription before it even gets activated with meta txn workflow', async () => {
-        // Deposit 1 ETH + some spare money for execution
-        assert.equal(await web3.eth.getBalance(gnosisSafe.options.address), 0)
-        await web3.eth.sendTransaction({
-            from: receiver,
-            to: gnosisSafe.options.address,
-            value: web3.utils.toWei('1.1', 'ether')
-        })
-        assert.equal(await web3.eth.getBalance(gnosisSafe.options.address), web3.utils.toWei('1.1', 'ether'))
 
-        let confirmingAccounts = [accounts[0], accounts[2]];
-        let subSig = await signer(
-            confirmingAccounts,
-            receiver,
-            web3.utils.toWei('50', 'ether'),
-            "0x",
-            CALL,
-            0,
-            0,
-            0,
-            "0x0000000000000000000000000000000000000000",
-            executor,
-            await subscriptionModule.methods.getSubscriptionMetaBytes(web3.utils.fromAscii('ethusd'), 1, 1, 0, 0).call()
-        );
-
-        let cancelTx = await subscriptionModule.methods.cancelSubscriptionAsOwner(
-            receiver,
-            web3.utils.toWei('50', 'ether'),
-            "0x",
-            CALL,
-            0,
-            0,
-            0,
-            "0x0000000000000000000000000000000000000000",
-            executor,
-            await subscriptionModule.methods.getSubscriptionMetaBytes(web3.utils.fromAscii('ethusd'), 1, 1, 0, 0).call(),
-            subSig
-        ).send({
-            from: accounts[0],
-            gasLimit: 8000000
-        });
-
-
-        await utils.shouldFailWithMessage(
-            subscriptionModule.methods.execSubscription(
-                receiver,
-                web3.utils.toWei('50', 'ether'),
-                "0x",
-                CALL,
-                0,
-                0,
-                0,
-                "0x0000000000000000000000000000000000000000",
-                executor,
-                await subscriptionModule.methods.getSubscriptionMetaBytes(web3.utils.fromAscii('ethusd'), 1, 1, 0, 0).call(),
-                subSig
-            ).send({
-                from: executor,
-                gasLimit: 8000000
-            }),
-            "SubscriptionModule::_processSub: INVALID_STATE: SUB_STATUS"
-        );
-    });
-
-    it('should deposit 1.1 ETH, create a $50 USD subscription but fail to execute it through a relay contract that attempts to re enter execSubscription', async () => {
+    it('should deposit 1.1 ETH, create a $50 USD subscription but fail to execute it through a re-entrancy contract that attempts to re enter execSubscription, stealing extra funds', async () => {
         assert.equal(await web3.eth.getBalance(gnosisSafe.options.address), 0)
         await web3.eth.sendTransaction({
             from: receiver,
@@ -707,18 +745,48 @@ contract('SubscriptionModule', async (accounts) => {
             doubleSigs
         ).encodeABI();
 
-        let cancelData = subscriptionModule.methods.cancelSubscription(
+        let cancelData = subscriptionModule.methods.cancelSubscriptionAsManager(
             subHash
         ).encodeABI();
 
+        let gnosisSafeNonceSecond = (await gnosisSafe.methods.nonce().call()) + 1;
 
-        let otp = web3.utils.toWei('0.1', 'ether')
+        let safeCancelTxDataSigs = await txSigner(
+            confirmingAccounts,
+            subscriptionModule.options.address,
+            0,
+            cancelData,
+            0,
+            0,
+            0,
+            0,
+            "0x0000000000000000000000000000000000000000",
+            "0x0000000000000000000000000000000000000000",
+            gnosisSafeNonceSecond
+        );
+
+        let safeCancelTxData = await gnosisSafe.methods.execTransaction(
+            subscriptionModule.options.address,
+            0,
+            cancelData,
+            0,
+            0,
+            0,
+            0,
+            "0x0000000000000000000000000000000000000000",
+            "0x0000000000000000000000000000000000000000",
+            safeCancelTxDataSigs
+        ).encodeABI();
+
+
+        let otp = web3.utils.toWei('0.1', 'ether');
+
         let nestedTransactionData = '0x' +
             tw.methods.send(
                 0,
-                subscriptionModule.options.address,
+                gnosisSafe.options.address,
                 0,
-                cancelData
+                safeCancelTxData
             ).encodeABI().substr(10) +
             tw.methods.send(
                 0,
@@ -1135,7 +1203,7 @@ contract('SubscriptionModule', async (accounts) => {
                         endDate: 0
                     }
                 }
-            ), "INVALID_STATE: SUB_NEXTWITHDRAW");
+            ), "INVALID_STATE: SUB_NEXT_WITHDRAW");
 
         let tx2 = resp.tx;
 
