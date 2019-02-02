@@ -9,8 +9,8 @@ contract OracleRegistry is Ownable {
     address payable private _networkWallet;
     address private _networkExecutor;
 
-    // TODO: set this to 0.005 ETH as WEI, bytes32 encoded
-    uint256 public baseFee = uint256(0x0000000000000000000000000000000000000000000000064eec68b56444c000);
+    // TODO: set this to 0.005 ETH as WEI, bytes32 encoded0x
+    uint256 public baseFee = uint256(0x0000000000000000000000000000000000000000000000000011c37937e08000);
 
     mapping(address => bool) public isWhitelisted;
     mapping(uint256 => address) public oracles;

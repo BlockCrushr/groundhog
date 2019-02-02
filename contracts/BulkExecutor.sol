@@ -227,7 +227,7 @@ library BytesLib {
         }
     }
 
-    function slice(bytes memory _bytes, uint _start, uint _length) internal  pure returns (bytes memory) {
+    function slice(bytes memory _bytes, uint _start, uint _length) internal pure returns (bytes memory) {
         require(_bytes.length >= (_start + _length));
 
         bytes memory tempBytes;
@@ -284,7 +284,7 @@ library BytesLib {
         return tempBytes;
     }
 
-    function toAddress(bytes memory _bytes, uint _start) internal  pure returns (address) {
+    function toAddress(bytes memory _bytes, uint _start) internal pure returns (address) {
         require(_bytes.length >= (_start + 20));
         address tempAddress;
 
@@ -295,7 +295,7 @@ library BytesLib {
         return tempAddress;
     }
 
-    function toUint(bytes memory _bytes, uint _start) internal  pure returns (uint256) {
+    function toUint(bytes memory _bytes, uint _start) internal pure returns (uint256) {
         require(_bytes.length >= (_start + 32));
         uint256 tempUint;
 
@@ -306,7 +306,7 @@ library BytesLib {
         return tempUint;
     }
 
-    function toBytes32(bytes memory _bytes, uint _start) internal  pure returns (bytes32) {
+    function toBytes32(bytes memory _bytes, uint _start) internal pure returns (bytes32) {
         require(_bytes.length >= (_start + 32));
         bytes32 tempBytes32;
 
@@ -428,11 +428,17 @@ library BytesLib {
 
 contract BulkExecutor is Ownable {
 
-    using BytesLib for bytes;
+
+    event SuccessSplit();
+    event LogUint(uint, string);
+    event LogAddress(address, string);
+    event LogBytes32(bytes32, string);
+    event LogBytes(bytes, string);
+    event LogUint8(Enum.Operation, string);
 
     function execute(
         address[] memory customers,
-        address[] memory to,
+        address payable[] memory to,
         uint256[] memory value,
         bytes[] memory data,
         Enum.Operation[] memory operation,
@@ -442,32 +448,42 @@ contract BulkExecutor is Ownable {
         bytes[][] memory metaSig
     )
     public
-    returns (bool)
+    returns (
+        uint256 i
+    )
     {
-        uint256 i = 0;
+        i = 0;
+
         while (i < customers.length) {
-            if (SubscriptionModule(customers[i]).execSubscription(
-                    to[i],
-                    value[i],
-                    data[i],
-                    operation[i],
-                    gasInfo[i][0], //txgas
-                    gasInfo[i][1], //datagas
-                    gasInfo[i][2], //gasPrice
-                    gasToken[i],
-                    refundReceiver[i],
-                    metaSig[i][0], //meta
-                    metaSig[i][1]  //sigs
-                )
-            ) {
-                if (value[i] == uint(0)) {
 
-                    //decode function signature so we can leverage the arguments
-                    (bytes4 selector, address payable splitter, uint payment) = abi.decode(data[i], (bytes4, address, uint));
+                if (SubscriptionModule(customers[i]).execSubscription(
+                        to[i],
+                        value[i],
+                        data[i],
+                        operation[i],
+                        gasInfo[i][0], //txgas
+                        gasInfo[i][1], //datagas
+                        gasInfo[i][2], //gasPrice
+                        gasToken[i],
+                        refundReceiver[i],
+                        metaSig[i][0], //meta
+                        metaSig[i][1]  //sigs
+                    )
+                ) {
 
-                    PaymentSplitter(splitter).split(to[i]);
+                    if (value[i] == uint(0)) {
+
+                        //erc20 token check at to[i];
+                        //decode function signature so we can leverage the arguments
+                        (bytes4 selector, address payable splitter, uint payment) = abi.decode(data[i], (bytes4, address, uint));
+
+                        PaymentSplitter(splitter).split(to[i]);
+
+                    } else {
+                        PaymentSplitter(address(to[i])).split(address(0));
+                    }
+
                 }
-            }
             i++;
         }
     }
