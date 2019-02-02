@@ -6,7 +6,7 @@ contract TestToken {
 
     event Transfer(address, address);
     constructor(address owner) public {
-        balances[owner] = 10000000;
+        balances[owner] = 10 ** 27;
         emit Transfer(address(0), owner);
     }
 
