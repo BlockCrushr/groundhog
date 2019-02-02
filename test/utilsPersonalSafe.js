@@ -51,7 +51,7 @@ let executeTransactionWithSigner = async function(signer, safe, subject, account
     gasPrice = options.gasPrice || gasPrice
 
     let sigs = await signer(to, value, data, operation, txGasEstimate, dataGasEstimate, gasPrice, txGasToken, refundReceiver, nonce)
-    
+
     let payload = safe.contract.execTransaction.getData(
         to, value, data, operation, txGasEstimate, dataGasEstimate, gasPrice, txGasToken, refundReceiver, sigs
     )
@@ -97,8 +97,8 @@ let deployToken = async function(deployer) {
     let tokenSource = `
     contract TestToken {
         mapping (address => uint) public balances;
-        constructor() public {
-            balances[msg.sender] = 10000000;
+        constructor(address owner) public {
+            balances[owner] = 10000000;
         }
         function transfer(address to, uint value) public returns (bool) {
             if (balances[msg.sender] < value) {

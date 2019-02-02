@@ -10,11 +10,6 @@ contract BulkExecutor is Ownable {
 
 
     event SuccessSplit();
-    event LogUint(uint, string);
-    event LogAddress(address, string);
-    event LogBytes32(bytes32, string);
-    event LogBytes(bytes, string);
-    event LogUint8(Enum.Operation, string);
 
     function execute(
         address[] memory customers,
@@ -33,37 +28,43 @@ contract BulkExecutor is Ownable {
     )
     {
         i = 0;
-
+        address transferDecode = address(this);
         while (i < customers.length) {
 
-                if (SubscriptionModule(customers[i]).execSubscription(
-                        to[i],
-                        value[i],
-                        data[i],
-                        operation[i],
-                        gasInfo[i][0], //txgas
-                        gasInfo[i][1], //datagas
-                        gasInfo[i][2], //gasPrice
-                        gasToken[i],
-                        refundReceiver[i],
-                        metaSig[i][0], //meta
-                        metaSig[i][1]  //sigs
-                    )
-                ) {
+            if (SubscriptionModule(customers[i]).execSubscription(
+                    to[i],
+                    value[i],
+                    data[i],
+                    operation[i],
+                    gasInfo[i][0], //txgas
+                    gasInfo[i][1], //datagas
+                    gasInfo[i][2], //gasPrice
+                    gasToken[i],
+                    refundReceiver[i],
+                    metaSig[i][0], //meta
+                    metaSig[i][1]  //sigs
+                )
+            ) {
 
-                    if (value[i] == uint(0)) {
+                if (value[i] == uint(0)) {
 
-                        //erc20 token check at to[i];
-                        //decode function signature so we can leverage the arguments
-                        (bytes4 selector, address payable splitter, uint payment) = abi.decode(data[i], (bytes4, address, uint));
-
-                        PaymentSplitter(splitter).split(to[i]);
-
-                    } else {
-                        PaymentSplitter(address(to[i])).split(address(0));
+                    address payable splitter;
+                    bytes memory dataLocal = data[i];
+                    // solium-disable-next-line security/no-inline-assembly
+                    assembly {
+                        splitter := div(mload(add(add(dataLocal, 0x20), 16)), 0x1000000000000000000000000)
                     }
 
+                    if ((PaymentSplitter(splitter).split(to[i]))) {
+                        emit SuccessSplit();
+                    }
+
+                } else {
+                    if (PaymentSplitter(address(to[i])).split(address(0))) {
+                        emit SuccessSplit();
+                    }
                 }
+            }
             i++;
         }
     }

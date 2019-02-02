@@ -584,6 +584,13 @@ contract('SubscriptionModule', async (accounts) => {
         // assert.equal(await web3.eth.getBalance(gnosisSafe.options.address), web3.utils.toWei('1.1', 'ether'))
 
 
+        let hogToken = await getInstance("TestToken", {create:true, constructorArgs: [gnosisSafe.options.address]});
+
+        console.log(`Hog Token ${hogToken.options.address}`);
+
+
+        let txdata = hogToken.methods.transfer(splitterModule.options.address, 1337).encodeABI();
+
         let confirmingAccounts = [accounts[0]];
 
         let customers = [],
@@ -601,14 +608,14 @@ contract('SubscriptionModule', async (accounts) => {
             signer,
             'executeSubscription withdraw $50 ETHUSD',
             confirmingAccounts,
-            splitterModule.options.address,
-            web3.utils.toWei('50', 'ether'),
-            "0x",
+            hogToken.options.address,
+            0,
+            txdata,
             CALL,
             executor,
             {
                 meta: {
-                    oracle: web3.utils.fromAscii('ethusd'), //oracle
+                    oracle: 0, //oracle
                     period: 1, //period
                     offChainID: 1, //
                     startDate: 0,
@@ -627,35 +634,35 @@ contract('SubscriptionModule', async (accounts) => {
         refundReceiver.push(resp1.dataFields.refundReceiver);
         metaSig.push([resp1.dataFields.meta, resp1.dataFields.sigs]);
 
-        // let resp2 = await executeSubscriptionWithSigner(
-        //     signer,
-        //     'executeSubscription withdraw $50 ETHUSD',
-        //     confirmingAccounts,
-        //     splitterModule.options.address,
-        //     web3.utils.toWei('50', 'ether'),
-        //     "0x",
-        //     CALL,
-        //     executor,
-        //     {
-        //         meta: {
-        //             oracle: web3.utils.fromAscii('ethusd'), //oracle
-        //             period: 1,
-        //             offChainID: 2,
-        //             startDate: 0,
-        //             endDate: 0 //slot 5
-        //         }
-        //     }
-        // );
+        let resp2 = await executeSubscriptionWithSigner(
+            signer,
+            'executeSubscription withdraw $50 ETHUSD',
+            confirmingAccounts,
+            splitterModule.options.address,
+            web3.utils.toWei('50', 'ether'),
+            "0x",
+            CALL,
+            executor,
+            {
+                meta: {
+                    oracle: web3.utils.fromAscii('ethusd'), //oracle
+                    period: 1,
+                    offChainID: 2,
+                    startDate: 0,
+                    endDate: 0 //slot 5
+                }
+            }
+        );
 
-        // customers.push(subscriptionModule.options.address);
-        // to.push(resp2.dataFields.to);
-        // value.push(resp2.dataFields.value);
-        // data.push(resp2.dataFields.data);
-        // operation.push(resp2.dataFields.operation);
-        // gasInfo.push([resp2.dataFields.txGasEstimate,resp2.dataFields.dataGasEstimate,resp2.dataFields.gasPrice]);
-        // gasToken.push(resp2.dataFields.gasToken);
-        // refundReceiver.push(resp2.dataFields.refundReceiver);
-        // metaSig.push([resp2.dataFields.meta, resp2.dataFields.sigs]);
+        customers.push(subscriptionModule.options.address);
+        to.push(resp2.dataFields.to);
+        value.push(resp2.dataFields.value);
+        data.push(resp2.dataFields.data);
+        operation.push(resp2.dataFields.operation);
+        gasInfo.push([resp2.dataFields.txGasEstimate,resp2.dataFields.dataGasEstimate,resp2.dataFields.gasPrice]);
+        gasToken.push(resp2.dataFields.gasToken);
+        refundReceiver.push(resp2.dataFields.refundReceiver);
+        metaSig.push([resp2.dataFields.meta, resp2.dataFields.sigs]);
 
         await timeHelper.advanceTimeAndBlock(96400);
 
@@ -675,7 +682,7 @@ contract('SubscriptionModule', async (accounts) => {
             metaSig
         ).send({from: accounts[0], gasLimit:8000000})
 
-        console.log("NOW bulk execute")
+        // console.log("NOW bulk execute")
 
         // console.log(bulk);
 
