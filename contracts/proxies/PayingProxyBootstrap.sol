@@ -14,6 +14,7 @@ import "./PayingProxy.sol";
 contract PayingProxyBootstrap is SecuredTokenTransfer {
 
     event ProxyCreation(Proxy proxy);
+    event PProxyCreation(PayingProxy proxy);
 
     /// @dev Allows to create new proxy contact and execute a message call to the new proxy within one transaction.
     constructor(
@@ -30,7 +31,10 @@ contract PayingProxyBootstrap is SecuredTokenTransfer {
     public
     {
         Proxy module = new Proxy(subModuleMasteryCopy);
+        emit ProxyCreation(module);
+
         PayingProxy safe = new PayingProxy(safeMasterCopy, funder, paymentToken, payment);
+        emit PProxyCreation(safe);
 
         bytes memory createAddData = abi.encodeWithSignature(
             'createNoFactory(address,bytes)', address(module), moduleSetupData
@@ -39,10 +43,11 @@ contract PayingProxyBootstrap is SecuredTokenTransfer {
         bytes memory safeSetupData = abi.encodeWithSignature(
             'setup(address[],uint256,address,bytes)', owners, threshold, createAddAddr, createAddData
         );
-
         assembly {
             if eq(call(gas, safe, 0, add(safeSetupData, 0x20), mload(safeSetupData), 0, 0), 0) {revert(0, 0)}
         }
+
+
         selfdestruct(funder);
     }
 }
