@@ -42,12 +42,21 @@ contract CreateAndAddModules {
         }
     }
     /// @dev Allows to create and add multiple module in one transaction.
-    function createAndAddModulesNoFactory(address proxyAddress)
+    function createNoFactory(address proxy, bytes memory data)
     public
     {
-        require(proxyAddress != address(0), "INVALID_DATA: PROXY_ADDRESS");
 
-        Module module = Module(proxyAddress);
+        require(proxy != address(0), "createAndAddModules::createNoFactory INVALID_DATA: PROXY_ADDRESS");
+
+        if (data.length > 0) {
+            // solium-disable-next-line security/no-inline-assembly
+            assembly {
+                if eq(call(gas, proxy, 0, add(data, 0x20), mload(data), 0, 0), 0) {}
+            }
+        }
+
+        Module module = Module(proxy);
         this.enableModule(module);
+
     }
 }

@@ -52,7 +52,7 @@ async function getParamFromTxEvent(transaction, eventName, paramName, contract, 
         // })
         param = events[1].returnValues[paramName]
     } else {
-        if (eventName != null && events.address === contract) {
+        if (contract != null && eventName != null && events.address === contract) {
             const rv = events.returnValues;
             logs = Object.keys(rv).filter((k, v) => {
                 if (k === paramName) {

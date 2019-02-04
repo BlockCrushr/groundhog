@@ -55,6 +55,15 @@ library DSMath {
         z = add(mul(x, RAY), y / 2) / y;
     }
 
+    function tmul(uint x, uint y, uint z) internal pure returns (uint a) {
+        require(z != 0);
+        a = add(mul(x, y), z / 2) / z;
+    }
+
+    function tdiv(uint x, uint y, uint z) internal pure returns (uint a) {
+        a = add(mul(x, z), y / 2) / y;
+    }
+
     // This famous algorithm is called "exponentiation by squaring"
     // and calculates x^n with x as fixed-point and n as regular unsigned.
     //

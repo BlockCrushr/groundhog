@@ -1,6 +1,8 @@
 pragma solidity ^0.5.0;
 
-import "./PayingProxyB.sol";
+import "../common/SecuredTokenTransfer.sol";
+
+import "./Proxy.sol";
 
 /// @title Counter-factual PayingProxy Bootstrap contract
 /// A PayingProxy that can also be bootstrapped immediately following creation in one txn
@@ -8,34 +10,50 @@ import "./PayingProxyB.sol";
 /// Using this Counter-factual address, a second address is generated, this is the safe address
 /// the user funds this address, and then this contract is deployed to bootstrap the safe and module creation
 /// @author Andrew Redden - <andrew@groundhog.network>
-contract PayingProxyBootstrap {
+contract PayingProxyBootstrap is SecuredTokenTransfer {
 
-    event ProxyBCreation(PayingProxyB proxy);
+    event ProxyCreation(Proxy proxy);
+
     /// @dev Allows to create new proxy contact and execute a message call to the new proxy within one transaction.
-    /// @param masterCopy Address of master copy.
-    /// @param data Payload for message call sent to new proxy contract.
-    /// @param funder Address of the funder
-    /// @param paymentToken address of the token to repay deployment
-    /// @param payment Value of the paymentToken to be paid for deployment
-    constructor (
-        address masterCopy,
-        bytes memory data,
+    constructor(
+        address subModuleMasteryCopy,
+        address safeMasterCopy,
+        bytes memory moduleSetupData,
+        address[] memory owners,
+        uint256 threshold,
+        address createAddAddr,
         address payable funder,
         address paymentToken,
         uint256 payment
     )
     public
     {
-        PayingProxyB proxy = new PayingProxyB(masterCopy, funder, paymentToken, payment);
+        Proxy module = new Proxy(subModuleMasteryCopy);
+        Proxy safe = new Proxy(safeMasterCopy);
 
-        if (data.length > 0)
-        // solium-disable-next-line security/no-inline-assembly
-            assembly {
-                if eq(call(gas, proxy, 0, add(data, 0x20), mload(data), 0, 0), 0) { revert(0, 0) }
+        bytes memory createAddData = abi.encodeWithSignature(
+            'createNoFactory(address,bytes)', address(module), moduleSetupData
+        );
+
+        bytes memory safeSetupData = abi.encodeWithSignature(
+            'setup(address[],uint256,address,bytes)', owners, threshold, createAddAddr, createAddData
+        );
+
+        assembly {
+            if eq(call(gas, safe, 0, add(safeSetupData, 0x20), mload(safeSetupData), 0, 0), 0) {revert(0, 0)}
+        }
+
+        emit ProxyCreation(module);
+        emit ProxyCreation(safe);
+        // no sense bloating chain with a bootstrap contract, make sure you selfdestruct after payment
+        if (payment > 0) {
+            if (paymentToken == address(0)) {
+                // solium-disable-next-line security/no-send
+                require(funder.send(payment), "Could not pay safe creation with ether");
+            } else {
+                require(transferToken(paymentToken, funder, payment), "Could not pay safe creation with token");
             }
-        emit ProxyBCreation(proxy);
-
-        // no sense bloating chain with a bootstrap contract, make sure you selfdestruct
-        selfdestruct(funder);
+        }
+//        selfdestruct(funder);
     }
 }

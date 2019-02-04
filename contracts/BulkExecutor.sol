@@ -4,7 +4,7 @@ pragma experimental ABIEncoderV2;
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "./common/Enum.sol";
 import "./modules/SubscriptionModule.sol";
-import "./modules/PaymentSplitter.sol";
+import "./modules/MerchantModule.sol";
 
 contract BulkExecutor is Ownable {
 
@@ -55,12 +55,12 @@ contract BulkExecutor is Ownable {
                         splitter := div(mload(add(add(dataLocal, 0x20), 16)), 0x1000000000000000000000000)
                     }
 
-                    if ((PaymentSplitter(splitter).split(to[i]))) {
+                    if ((MerchantModule(splitter).split(to[i]))) {
                         emit SuccessSplit();
                     }
 
                 } else {
-                    if (PaymentSplitter(address(to[i])).split(address(0))) {
+                    if (MerchantModule(address(to[i])).split(address(0))) {
                         emit SuccessSplit();
                     }
                 }

@@ -52,13 +52,11 @@ contract SubscriptionModule is Module, SignatureDecoder {
         uint256 conversionRate,
         uint256 paymentTotal
     );
-    event Cancelled(
-        bytes32 subHash
-    );
     event Processed(
         bytes32 subHash
     );
     event StatusChanged(
+        bytes32 subscriptionHash,
         GEnum.SubscriptionStatus previous,
         GEnum.SubscriptionStatus next
     );
@@ -356,29 +354,60 @@ contract SubscriptionModule is Module, SignatureDecoder {
     authorized
     public
     returns (bool) {
-        Meta storage sub = subscriptions[subscriptionHash];
 
-        require(
-            (sub.status != GEnum.SubscriptionStatus.CANCELLED) && (sub.status != GEnum.SubscriptionStatus.EXPIRED),
-            "SubscriptionModule::cancelSubscriptionAsManager: INVALID_STATE: SUB_STATUS"
-        );
+        _cancelSubscription(subscriptionHash);
 
-        if (sub.status != GEnum.SubscriptionStatus.INIT) {
-            sub.endDate = sub.nextWithdraw;
-        }
-
-        emit StatusChanged(
-            sub.status, GEnum.SubscriptionStatus.CANCELLED
-        );
-
-        sub.status = GEnum.SubscriptionStatus.CANCELLED;
-        sub.nextWithdraw = 0;
-
-        emit Cancelled(
-            subscriptionHash
-        );
         return true;
     }
+
+    function cancelSubscriptionAsRecipient(
+        address to,
+        uint256 value,
+        bytes memory data,
+        Enum.Operation operation,
+        uint256 safeTxGas,
+        uint256 dataGas,
+        uint256 gasPrice,
+        address gasToken,
+        address refundReceiver,
+        bytes memory meta,
+        bytes memory signatures
+    )
+    public
+    returns (bool) {
+
+
+        bytes memory subHashData = encodeSubscriptionData(
+            to, value, data, operation, // Transaction info
+            safeTxGas, dataGas, gasPrice, gasToken,
+            refundReceiver, meta
+        );
+
+        require(
+            _checkHash(keccak256(subHashData), signatures),
+            "SubscriptionModule::cancelSubscriptionAsRecipient: INVALID_DATA: SIGNATURES"
+        );
+
+        //if no value, assume its an ERC20 token, remove the to argument from the data
+        if (value == uint(0)) {
+
+            address recipient;
+            // solium-disable-next-line security/no-inline-assembly
+            assembly {
+                recipient := div(mload(add(add(data, 0x20), 16)), 0x1000000000000000000000000)
+            }
+            require(msg.sender == recipient, "SubscriptionModule::isRecipient: MSG_SENDER_NOT_RECIPIENT_ERC");
+        } else {
+
+            //we are sending ETH, so check the sender matches to argument
+            require(msg.sender == to, "SubscriptionModule::isRecipient: MSG_SENDER_NOT_RECIPIENT_ETH");
+        }
+
+        _cancelSubscription(keccak256(subHashData));
+
+        return true;
+    }
+
 
     /// @dev Allows to execute a Safe transaction confirmed by required number of owners and then pays the account that
     /// submitted the transaction.
@@ -391,19 +420,35 @@ contract SubscriptionModule is Module, SignatureDecoder {
     returns (bool)
     {
 
-        Meta storage sub = subscriptions[subscriptionHash];
-
-
-        require(
-            (sub.status != GEnum.SubscriptionStatus.CANCELLED && sub.status != GEnum.SubscriptionStatus.EXPIRED),
-            "SubscriptionModule::cancelSubscription: INVALID_STATE: SUB_STATUS"
-        );
-
         bytes32 cancelHash = getSubscriptionCancelHash(subscriptionHash);
 
         require(
             _checkHash(cancelHash, signatures),
             "SubscriptionModule::cancelSubscription: INVALID_DATA: SIGNATURES_INVALID"
+        );
+
+        _cancelSubscription(subscriptionHash);
+
+        return true;
+    }
+
+
+    function _cancelSubscription(bytes32 subscriptionHash)
+    internal
+    {
+
+        Meta storage sub = subscriptions[subscriptionHash];
+
+
+        require(
+            (sub.status != GEnum.SubscriptionStatus.CANCELLED && sub.status != GEnum.SubscriptionStatus.EXPIRED),
+            "SubscriptionModule::_cancelSubscription: INVALID_STATE: SUB_STATUS"
+        );
+
+        emit StatusChanged(
+            subscriptionHash,
+            sub.status,
+            GEnum.SubscriptionStatus.CANCELLED
         );
 
         sub.status = GEnum.SubscriptionStatus.CANCELLED;
@@ -413,12 +458,6 @@ contract SubscriptionModule is Module, SignatureDecoder {
         }
 
         sub.nextWithdraw = 0;
-
-        emit Cancelled(
-            subscriptionHash
-        );
-
-        return true;
     }
 
     /// @dev used to help mitigate stack issues
@@ -466,6 +505,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
                 sub.nextWithdraw = startDate;
                 sub.status = GEnum.SubscriptionStatus.TRIAL;
                 emit StatusChanged(
+                    subscriptionHash,
                     GEnum.SubscriptionStatus.INIT,
                     GEnum.SubscriptionStatus.TRIAL
                 );
@@ -474,6 +514,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
                 sub.nextWithdraw = now;
                 sub.status = GEnum.SubscriptionStatus.VALID;
                 emit StatusChanged(
+                    subscriptionHash,
                     GEnum.SubscriptionStatus.INIT,
                     GEnum.SubscriptionStatus.VALID
                 );
@@ -487,6 +528,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
             sub.nextWithdraw = now;
             sub.status = GEnum.SubscriptionStatus.VALID;
             emit StatusChanged(
+                subscriptionHash,
                 GEnum.SubscriptionStatus.TRIAL,
                 GEnum.SubscriptionStatus.VALID
             );
@@ -515,16 +557,22 @@ contract SubscriptionModule is Module, SignatureDecoder {
         //if a subscription is expiring and its next withdraw timeline is beyond hte time of the expiration
         //modify the status
         if (sub.endDate != 0 && withdrawHolder > sub.endDate) {
+
             sub.nextWithdraw = 0;
             emit StatusChanged(
-                sub.status, GEnum.SubscriptionStatus.EXPIRED
+                subscriptionHash,
+                sub.status,
+                GEnum.SubscriptionStatus.EXPIRED
             );
             sub.status = GEnum.SubscriptionStatus.EXPIRED;
         } else {
             sub.nextWithdraw = withdrawHolder;
         }
 
-        emit Processed(subscriptionHash);
+        emit Processed(
+            subscriptionHash
+        );
+
         return true;
     }
 

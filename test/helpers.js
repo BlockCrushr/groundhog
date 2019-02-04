@@ -6,6 +6,7 @@ const getWeb3 = () => {
 }
 
 const getContractInstance = (web3) => async (contractName, opts) => {
+
     opts = opts || {
         localABI: null,
         create: false,
@@ -19,7 +20,9 @@ const getContractInstance = (web3) => async (contractName, opts) => {
     }
 
     const artifact = artifacts.require(contractName);
-
+    artifact.defaults({
+        gas:8000000
+    })
     let instance = null;
     let newArtifact = null;
 
@@ -29,8 +32,13 @@ const getContractInstance = (web3) => async (contractName, opts) => {
         instance = new web3.eth.Contract(artifact.abi, artifact.networks[artifact.network_id].address);
     } else if (opts.create) {
         if (opts.constructorArgs) {
-            if (opts.constructorArgs.length === 1) {
-                newArtifact = await artifact.new(opts.constructorArgs[0]);
+            if (Array.isArray(opts.constructorArgs)) {
+                if(opts.constructorArgs.length === 1) {
+                    newArtifact = await artifact.new(opts.constructorArgs[0]);
+                } else {
+                    newArtifact = await artifact.new.apply(artifact, opts.constructorArgs);
+                }
+
             } else {
                 newArtifact = await artifact.new(opts.constructorArgs);
             }

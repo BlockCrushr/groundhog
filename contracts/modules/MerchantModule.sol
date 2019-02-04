@@ -5,6 +5,20 @@ import "../external/Math.sol";
 import "../OracleRegistry.sol";
 import "../common/SecuredTokenTransfer.sol";
 
+interface SM {
+    function cancelSubscriptionAsRecipient(
+        address to,
+        uint256 value,
+        bytes calldata data,
+        uint8 operation,
+        uint256 safeTxGas,
+        uint256 dataGas,
+        uint256 gasPrice,
+        address gasToken,
+        address payable refundReceiver,
+        bytes calldata meta,
+        bytes calldata signatures) external returns (bool);
+}
 
 interface ERC20 {
     function totalSupply() external view returns (uint256 supply);
@@ -25,7 +39,7 @@ interface ERC20 {
 }
 
 
-contract PaymentSplitter is Module, SecuredTokenTransfer {
+contract MerchantModule is Module, SecuredTokenTransfer {
 
     using DSMath for uint256;
 
@@ -33,9 +47,9 @@ contract PaymentSplitter is Module, SecuredTokenTransfer {
 
     event IncomingPayment(uint256 payment);
     event PaymentSent(address asset, address receiver, uint256 payment);
-//    event LogUint(uint, string);
-//    event LogAddress(address, string);
-//    event LogBytes32(bytes32, string);
+    //    event LogUint(uint, string);
+    //    event LogAddress(address, string);
+    //    event LogBytes32(bytes32, string);
 
     function setup(address _oracleRegistry)
     public
@@ -43,7 +57,7 @@ contract PaymentSplitter is Module, SecuredTokenTransfer {
         setManager();
         require(
             address(oracleRegistry) == address(0),
-            "PaymentSplitter::setup: INVALID_STATE: ORACLE_REGISTRY_SET"
+            "MerchantModule::setup: INVALID_STATE: ORACLE_REGISTRY_SET"
         );
         oracleRegistry = OracleRegistry(_oracleRegistry);
     }
@@ -62,7 +76,7 @@ contract PaymentSplitter is Module, SecuredTokenTransfer {
     {
         require(
             msg.sender == oracleRegistry.getNetworkExecutor(),
-            "PaymentSplitter::split: INVALID_DATA: MSG_SENDER_NOT_EXECUTOR"
+            "MerchantModule::split: INVALID_DATA: MSG_SENDER_NOT_EXECUTOR"
         );
 
         address payable networkWallet = oracleRegistry.getNetworkWallet();
@@ -71,26 +85,26 @@ contract PaymentSplitter is Module, SecuredTokenTransfer {
         if (tokenAddress == address(0)) {
 
             uint256 splitterBalanceStart = address(this).balance;
-            if(splitterBalanceStart == 0) return false;
-//            emit LogUint(splitterBalanceStart, "splitterBalanceStart");
+            if (splitterBalanceStart == 0) return false;
+            //            emit LogUint(splitterBalanceStart, "splitterBalanceStart");
             //
             uint256 fee = oracleRegistry.getNetworkFee(address(0));
-//            emit LogUint(fee, "fee");
+            //            emit LogUint(fee, "fee");
 
 
             uint256 networkBalanceStart = networkWallet.balance;
-//            emit LogUint(networkBalanceStart, "networkBalanceStart");
+            //            emit LogUint(networkBalanceStart, "networkBalanceStart");
 
             uint256 merchantBalanceStart = merchantWallet.balance;
 
-//            emit LogUint(merchantBalanceStart, "merchantBalanceStart");
+            //            emit LogUint(merchantBalanceStart, "merchantBalanceStart");
 
             uint256 networkSplit = splitterBalanceStart.wmul(fee);
-//            emit LogUint(networkSplit, "networkSplit");
+            //            emit LogUint(networkSplit, "networkSplit");
 
             uint256 merchantSplit = splitterBalanceStart.sub(networkSplit);
 
-//            emit LogUint(merchantSplit, "merchantSplit");
+            //            emit LogUint(merchantSplit, "merchantSplit");
 
             require(merchantSplit > networkSplit, "Split Math is Wrong");
             //pay network
@@ -106,44 +120,44 @@ contract PaymentSplitter is Module, SecuredTokenTransfer {
                 (networkBalanceStart.add(networkSplit) == networkWallet.balance)
                 &&
                 (merchantBalanceStart.add(merchantSplit) == merchantWallet.balance),
-                "PaymentSplitter::withdraw: INVALID_EXEC SPLIT_PAYOUT"
+                "MerchantModule::withdraw: INVALID_EXEC SPLIT_PAYOUT"
             );
         } else {
 
             ERC20 token = ERC20(tokenAddress);
 
             uint256 splitterBalanceStart = token.balanceOf(address(this));
-//            emit LogUint(splitterBalanceStart, "splitterBalanceStart");
+            //            emit LogUint(splitterBalanceStart, "splitterBalanceStart");
 
 
-            if(splitterBalanceStart == 0) return false;
+            if (splitterBalanceStart == 0) return false;
 
             uint256 fee = oracleRegistry.getNetworkFee(address(token));
 
-//            emit LogUint(fee, "fee");
+            //            emit LogUint(fee, "fee");
 
             uint256 merchantBalanceStart = token.balanceOf(merchantWallet);
 
-//            emit LogUint(merchantBalanceStart, "merchantBalanceStart");
+            //            emit LogUint(merchantBalanceStart, "merchantBalanceStart");
 
             uint256 networkSplit = splitterBalanceStart.wmul(fee);
 
-//            emit LogUint(networkSplit, "networkSplit");
+            //            emit LogUint(networkSplit, "networkSplit");
 
             uint256 merchantSplit = splitterBalanceStart.sub(networkSplit);
 
-//            emit LogUint(merchantSplit, "merchantSplit");
+            //            emit LogUint(merchantSplit, "merchantSplit");
 
             require(
                 networkSplit.add(merchantSplit) == splitterBalanceStart,
-                "PaymentSplitter::withdraw: INVALID_EXEC TOKEN_SPLIT"
+                "MerchantModule::withdraw: INVALID_EXEC TOKEN_SPLIT"
             );
 
             //pay network
 
             require(
                 transferToken(address(token), networkWallet, networkSplit),
-                "PaymentSplitter::withdraw: INVALID_EXEC TOKEN_NETWORK_PAYOUT"
+                "MerchantModule::withdraw: INVALID_EXEC TOKEN_NETWORK_PAYOUT"
             );
 
             emit PaymentSent(address(token), networkWallet, networkSplit);
@@ -151,10 +165,44 @@ contract PaymentSplitter is Module, SecuredTokenTransfer {
             //pay merchant
             require(
                 transferToken(address(token), merchantWallet, merchantSplit),
-                "PaymentSplitter::withdraw: INVALID_EXEC TOKEN_MERCHANT_PAYOUT"
+                "MerchantModule::withdraw: INVALID_EXEC TOKEN_MERCHANT_PAYOUT"
             );
             emit PaymentSent(address(token), merchantWallet, merchantSplit);
         }
         return true;
     }
+
+
+    function cancelCXSubscription(
+        address customer,
+        address to,
+        uint256 value,
+        bytes memory data,
+        uint8 operation,
+        uint256 safeTxGas,
+        uint256 dataGas,
+        uint256 gasPrice,
+        address gasToken,
+        address payable refundReceiver,
+        bytes memory meta,
+        bytes memory signatures
+    )
+    public
+    authorized
+    {
+        SM(customer).cancelSubscriptionAsRecipient(
+            to,
+            value,
+            data,
+            operation,
+            safeTxGas,
+            dataGas,
+            gasPrice,
+            gasToken,
+            refundReceiver,
+            meta,
+            signatures
+        );
+    }
+
 }
