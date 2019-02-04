@@ -3,6 +3,7 @@ pragma solidity ^0.5.0;
 import "../common/SecuredTokenTransfer.sol";
 
 import "./Proxy.sol";
+import "./PayingProxy.sol";
 
 /// @title Counter-factual PayingProxy Bootstrap contract
 /// A PayingProxy that can also be bootstrapped immediately following creation in one txn
@@ -29,7 +30,7 @@ contract PayingProxyBootstrap is SecuredTokenTransfer {
     public
     {
         Proxy module = new Proxy(subModuleMasteryCopy);
-        Proxy safe = new Proxy(safeMasterCopy);
+        PayingProxy safe = new PayingProxy(safeMasterCopy, funder, paymentToken, payment);
 
         bytes memory createAddData = abi.encodeWithSignature(
             'createNoFactory(address,bytes)', address(module), moduleSetupData
@@ -42,18 +43,6 @@ contract PayingProxyBootstrap is SecuredTokenTransfer {
         assembly {
             if eq(call(gas, safe, 0, add(safeSetupData, 0x20), mload(safeSetupData), 0, 0), 0) {revert(0, 0)}
         }
-
-        emit ProxyCreation(module);
-        emit ProxyCreation(safe);
-        // no sense bloating chain with a bootstrap contract, make sure you selfdestruct after payment
-        if (payment > 0) {
-            if (paymentToken == address(0)) {
-                // solium-disable-next-line security/no-send
-                require(funder.send(payment), "Could not pay safe creation with ether");
-            } else {
-                require(transferToken(paymentToken, funder, payment), "Could not pay safe creation with token");
-            }
-        }
-//        selfdestruct(funder);
+        selfdestruct(funder);
     }
 }

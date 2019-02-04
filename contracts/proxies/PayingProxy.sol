@@ -10,13 +10,13 @@ contract PayingProxy is SecuredTokenTransfer {
     // masterCopy always needs to be first declared variable, to ensure that it is at the same location in the contracts to which calls are delegated.
     address masterCopy;
 
-    function setup(
+    constructor(
         address _masterCopy,
         address payable funder,
         address paymentToken,
         uint256 payment
     )
-    external
+    public
     {
         require(_masterCopy != address(0), "Invalid master copy address provided");
         masterCopy = _masterCopy;
