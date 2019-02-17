@@ -2,8 +2,6 @@ pragma solidity ^0.5.0;
 pragma experimental ABIEncoderV2;
 
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
-import "./common/Enum.sol";
-import "./modules/SubscriptionModule.sol";
 import "./modules/MerchantModule.sol";
 
 contract BulkExecutor is Ownable {
@@ -17,10 +15,10 @@ contract BulkExecutor is Ownable {
         uint256[] memory value,
         bytes[] memory data,
         Enum.Operation[] memory operation,
-        uint256[][] memory gasInfo, //0 txgas 1dataGas 2 gasPrice
+        uint256[][3] memory gasInfo, //0 txgas 1dataGas 2 gasPrice
         address[] memory gasToken,
         address payable[] memory refundReceiver,
-        bytes[][] memory metaSig
+        bytes[][2] memory metaSig
     )
     public
     returns (
@@ -28,10 +26,9 @@ contract BulkExecutor is Ownable {
     )
     {
         i = 0;
-        address transferDecode = address(this);
-        while (i < customers.length) {
 
-            if (SubscriptionModule(customers[i]).execSubscription(
+        while (i < customers.length) {
+            if (SM(customers[i]).execSubscription(
                     to[i],
                     value[i],
                     data[i],
@@ -46,24 +43,24 @@ contract BulkExecutor is Ownable {
                 )
             ) {
 
-                if (value[i] == uint(0)) {
-
-                    address payable splitter;
-                    bytes memory dataLocal = data[i];
-                    // solium-disable-next-line security/no-inline-assembly
-                    assembly {
-                        splitter := div(mload(add(add(dataLocal, 0x20), 16)), 0x1000000000000000000000000)
-                    }
-
-                    if ((MerchantModule(splitter).split(to[i]))) {
-                        emit SuccessSplit();
-                    }
-
-                } else {
-                    if (MerchantModule(address(to[i])).split(address(0))) {
-                        emit SuccessSplit();
-                    }
-                }
+//                if (value[i] == uint(0)) {
+//
+//                    address payable splitter;
+//                    bytes memory dataLocal = data[i];
+//                    // solium-disable-next-line security/no-inline-assembly
+//                    assembly {
+//                        splitter := div(mload(add(add(dataLocal, 0x20), 16)), 0x1000000000000000000000000)
+//                    }
+//
+//                    if ((MerchantModule(splitter).split(to[i]))) {
+//                        emit SuccessSplit();
+//                    }
+//
+//                } else {
+//                    if (MerchantModule(address(to[i])).split(address(0))) {
+//                        emit SuccessSplit();
+//                    }
+//                }
             }
             i++;
         }

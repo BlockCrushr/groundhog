@@ -1,24 +1,10 @@
 pragma solidity ^0.5.0;
 
 import "../base/Module.sol";
+import "./interfaces/SubscriptionModule.sol";
 import "../external/Math.sol";
 import "../OracleRegistry.sol";
 import "../common/SecuredTokenTransfer.sol";
-
-interface SM {
-    function cancelSubscriptionAsRecipient(
-        address to,
-        uint256 value,
-        bytes calldata data,
-        uint8 operation,
-        uint256 safeTxGas,
-        uint256 dataGas,
-        uint256 gasPrice,
-        address gasToken,
-        address payable refundReceiver,
-        bytes calldata meta,
-        bytes calldata signatures) external returns (bool);
-}
 
 interface ERC20 {
     function totalSupply() external view returns (uint256 supply);
@@ -178,7 +164,7 @@ contract MerchantModule is Module, SecuredTokenTransfer {
         address to,
         uint256 value,
         bytes memory data,
-        uint8 operation,
+        Enum.Operation operation,
         uint256 safeTxGas,
         uint256 dataGas,
         uint256 gasPrice,

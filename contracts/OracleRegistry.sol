@@ -32,13 +32,7 @@ contract OracleRegistry is Ownable {
         require(_oracles.length == _currencyPair.length);
 
         for (uint256 i = 0; i < _oracles.length; i++) {
-            address oracle = _oracles[i];
-            uint256 cp = _currencyPair[i];
-            require(oracle != address(0), "OracleResigstry::setup INVALID_DATA: ORACLE_ADDRESS");
-            require(cp != uint256(0), "OracleResigstry::setup INVALID_DATA: ORACLE_CURRENCY_PAIR");
-            oracles[cp] = oracle;
-            isWhitelisted[oracle] = true;
-            emit OracleActivated(oracle, cp);
+            addToWhitelist(_oracles[i], _currencyPair[i]);
         }
 
         require(_networkSettings.length == 2, "OracleResigstry::setup INVALID_DATA: NETWORK_SETTINGS_LENGTH");
@@ -60,13 +54,16 @@ contract OracleRegistry is Ownable {
 
     /// @dev Allows to add destination to whitelist. This can only be done via a Safe transaction.
     /// @param oracle Destination address.
-    function addToWhitelist(address oracle)
+    function addToWhitelist(address oracle, uint256 currencyPair)
     public
     onlyOwner
     {
-        require(oracle != address(0), "Invalid Address provided");
-        require(!isWhitelisted[oracle], "Address is already whitelisted");
+        require(!isWhitelisted[oracle], "OracleResigstry::addToWhitelist INVALID_STATE: ORACLE_WHITELIST");
+        require(oracle != address(0), "OracleResigstry::addToWhitelist INVALID_DATA: ORACLE_ADDRESS");
+        require(currencyPair != uint256(0), "OracleResigstry::addToWhitelist INVALID_DATA: ORACLE_CURRENCY_PAIR");
+        oracles[currencyPair] = oracle;
         isWhitelisted[oracle] = true;
+        emit OracleActivated(oracle, currencyPair);
     }
 
     /// @dev Allows to remove destination from whitelist. This can only be done via a Safe transaction.

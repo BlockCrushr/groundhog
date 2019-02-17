@@ -40,24 +40,24 @@ contract SubscriptionModule is Module, SignatureDecoder {
     struct Meta {
         GEnum.SubscriptionStatus status;
         uint256 nextWithdraw;
-        uint256 offChainID;
         uint256 endDate;
+        uint256 cycle;
     }
 
-    event PaymentFailed(
-        bytes32 subscriptionHash
+    event NextPayment(
+        bytes32 indexed subscriptionHash,
+        uint256 nextWithdraw
     );
-    event DynamicPayment(
+
+    event OraclizedDenomination(
+        bytes32 indexed subscriptionHash,
         uint256 dynPriceFormat,
         uint256 conversionRate,
         uint256 paymentTotal
     );
-    event Processed(
-        bytes32 subHash
-    );
     event StatusChanged(
-        bytes32 subscriptionHash,
-        GEnum.SubscriptionStatus previous,
+        bytes32 indexed subscriptionHash,
+        GEnum.SubscriptionStatus prev,
         GEnum.SubscriptionStatus next
     );
 
@@ -76,7 +76,8 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
         domainSeparator = keccak256(
             abi.encode(
-                DOMAIN_SEPARATOR_TYPEHASH, address(this)
+                DOMAIN_SEPARATOR_TYPEHASH,
+                address(this)
             )
         );
 
@@ -117,7 +118,8 @@ contract SubscriptionModule is Module, SignatureDecoder {
         bytes memory signatures
     )
     public
-    returns (
+    returns
+    (
         bool
     )
     {
@@ -135,7 +137,9 @@ contract SubscriptionModule is Module, SignatureDecoder {
         );
 
         require(
-            _checkHash(keccak256(subHashData), signatures),
+            _checkHash(
+                keccak256(subHashData), signatures
+            ),
             "SubscriptionModule::execSubscription: INVALID_DATA: SIGNATURES"
         );
 
@@ -146,7 +150,13 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
         // We transfer the calculated tx costs to the refundReceiver to avoid sending it to intermediate contracts that have made calls
         if (gasPrice > 0) {
-            _handleTxPayment(startGas, dataGas, gasPrice, gasToken, refundReceiver);
+            _handleTxPayment(
+                startGas,
+                dataGas,
+                gasPrice,
+                gasToken,
+                refundReceiver
+            );
         }
 
         return true;
@@ -195,7 +205,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
         uint256 value,
         bytes memory data,
         Enum.Operation operation,
-        bytes32 subHash,
+        bytes32 subscriptionHash,
         bytes memory meta
     )
     internal
@@ -205,7 +215,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
         (conversionRate, processedMetaData) = _processMeta(meta);
 
-        bool processPayment = _processSub(subHash, processedMetaData);
+        bool processPayment = _processSub(subscriptionHash, processedMetaData);
 
         if (processPayment) {
 
@@ -221,8 +231,11 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
                 uint256 payment = value.wdiv(conversionRate);
 
-                emit DynamicPayment(
-                    value, conversionRate, payment
+                emit OraclizedDenomination(
+                    subscriptionHash,
+                    value,
+                    conversionRate,
+                    payment
                 );
 
                 value = payment;
@@ -323,29 +336,31 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
         Meta storage sub = subscriptions[subscriptionHash];
 
-        if (sub.status == GEnum.SubscriptionStatus.TRIAL && sub.nextWithdraw <= now) {
-
-            return true;
-        } else if (sub.status == GEnum.SubscriptionStatus.VALID) {
-
-            return true;
-        } else if (sub.status == GEnum.SubscriptionStatus.EXPIRED || sub.status == GEnum.SubscriptionStatus.CANCELLED) {
-
-            require(
-                sub.endDate != 0,
-                "SubscriptionModule::isValidSubscription: INVALID_STATE: SUB_EXPIRES"
-            );
-
-            return (now <= sub.endDate);
-        } else if (sub.status == GEnum.SubscriptionStatus.INIT) {
-
+        //exit early if we can
+        if (sub.status == GEnum.SubscriptionStatus.INIT) {
             return _checkHash(
                 subscriptionHash,
                 signatures
             );
         }
 
-        return false;
+        if (sub.status == GEnum.SubscriptionStatus.EXPIRED || sub.status == GEnum.SubscriptionStatus.CANCELLED) {
+
+            require(
+                sub.endDate != 0,
+                "SubscriptionModule::isValidSubscription: INVALID_STATE: SUB_STATUS"
+            );
+
+            isValid = (now <= sub.endDate);
+        } else if (
+            (sub.status == GEnum.SubscriptionStatus.TRIAL && sub.nextWithdraw <= now)
+            ||
+            (sub.status == GEnum.SubscriptionStatus.VALID)
+        ) {
+            isValid = true;
+        } else {
+            isValid = false;
+        }
     }
 
     function cancelSubscriptionAsManager(
@@ -420,7 +435,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
     returns (bool)
     {
 
-        bytes32 cancelHash = getSubscriptionCancelHash(subscriptionHash);
+        bytes32 cancelHash = getSubscriptionActionHash(subscriptionHash, "cancel");
 
         require(
             _checkHash(cancelHash, signatures),
@@ -458,6 +473,11 @@ contract SubscriptionModule is Module, SignatureDecoder {
         }
 
         sub.nextWithdraw = 0;
+
+        emit NextPayment(
+            subscriptionHash,
+            sub.nextWithdraw
+        );
     }
 
     /// @dev used to help mitigate stack issues
@@ -486,31 +506,37 @@ contract SubscriptionModule is Module, SignatureDecoder {
         if (sub.status == GEnum.SubscriptionStatus.INIT) {
 
             if (endDate != 0) {
+
                 require(
-                    endDate > now,
+                    endDate >= now,
                     "SubscriptionModule::_processSub: INVALID_DATA: SUB_END_DATE"
                 );
                 sub.endDate = endDate;
             }
 
-            if (offChainID != 0) {
-                sub.offChainID = offChainID;
-            }
-
             if (startDate != 0) {
+
                 require(
                     startDate >= now,
                     "SubscriptionModule::_processSub: INVALID_DATA: SUB_START_DATE"
                 );
                 sub.nextWithdraw = startDate;
                 sub.status = GEnum.SubscriptionStatus.TRIAL;
+
                 emit StatusChanged(
                     subscriptionHash,
                     GEnum.SubscriptionStatus.INIT,
                     GEnum.SubscriptionStatus.TRIAL
                 );
+                //emit here because of early method exit after trial setup
+                emit NextPayment(
+                    subscriptionHash,
+                    sub.nextWithdraw
+                );
+
                 return false;
             } else {
+
                 sub.nextWithdraw = now;
                 sub.status = GEnum.SubscriptionStatus.VALID;
                 emit StatusChanged(
@@ -521,12 +547,14 @@ contract SubscriptionModule is Module, SignatureDecoder {
             }
 
         } else if (sub.status == GEnum.SubscriptionStatus.TRIAL) {
+
             require(
                 now >= startDate,
                 "SubscriptionModule::_processSub: INVALID_STATE: SUB_START_DATE"
             );
             sub.nextWithdraw = now;
             sub.status = GEnum.SubscriptionStatus.VALID;
+
             emit StatusChanged(
                 subscriptionHash,
                 GEnum.SubscriptionStatus.TRIAL,
@@ -550,13 +578,15 @@ contract SubscriptionModule is Module, SignatureDecoder {
             withdrawHolder = BokkyPooBahsDateTimeLibrary.addDays(sub.nextWithdraw, 7);
         } else if (period == uint256(GEnum.Period.MONTH)) {
             withdrawHolder = BokkyPooBahsDateTimeLibrary.addMonths(sub.nextWithdraw, 1);
+        } else if (period == uint256(GEnum.Period.YEAR)) {
+            withdrawHolder = BokkyPooBahsDateTimeLibrary.addYears(sub.nextWithdraw, 1);
         } else {
             revert("SubscriptionModule::_processSub: INVALID_DATA: PERIOD");
         }
 
         //if a subscription is expiring and its next withdraw timeline is beyond hte time of the expiration
         //modify the status
-        if (sub.endDate != 0 && withdrawHolder > sub.endDate) {
+        if (sub.endDate != 0 && withdrawHolder >= sub.endDate) {
 
             sub.nextWithdraw = 0;
             emit StatusChanged(
@@ -569,8 +599,9 @@ contract SubscriptionModule is Module, SignatureDecoder {
             sub.nextWithdraw = withdrawHolder;
         }
 
-        emit Processed(
-            subscriptionHash
+        emit NextPayment(
+            subscriptionHash,
+            sub.nextWithdraw
         );
 
         return true;
@@ -641,8 +672,9 @@ contract SubscriptionModule is Module, SignatureDecoder {
     }
 
     /// @dev Returns hash to be signed by owners for cancelling a subscription
-    function getSubscriptionCancelHash(
-        bytes32 subscriptionHash
+    function getSubscriptionActionHash(
+        bytes32 subscriptionHash,
+        string memory action
     )
     public
     view
@@ -653,7 +685,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
             abi.encode(
                 SAFE_SUB_CANCEL_TX_TYPEHASH,
                 subscriptionHash,
-                keccak256("cancel")
+                keccak256(abi.encodePacked(action))
             )
         );
 
@@ -760,9 +792,6 @@ contract SubscriptionModule is Module, SignatureDecoder {
             );
 
             uint256 payment = value.wdiv(conversionRate);
-
-            emit DynamicPayment(value, conversionRate, payment);
-
             value = payment;
         }
 

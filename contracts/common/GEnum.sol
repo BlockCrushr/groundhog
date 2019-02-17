@@ -15,6 +15,7 @@ contract GEnum {
         INIT,
         DAY,
         WEEK,
-        MONTH
+        MONTH,
+        YEAR
     }
 }
