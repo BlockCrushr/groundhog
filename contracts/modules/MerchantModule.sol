@@ -53,10 +53,11 @@ contract MerchantModule is Module, SecuredTokenTransfer {
     external
     {
         emit IncomingPayment(msg.value);
-        //        require(split(address(0)), "Split Failed");
     }
 
-    function split(address tokenAddress)
+    function split(
+        address tokenAddress
+    )
     public
     returns (bool)
     {

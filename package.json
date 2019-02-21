@@ -14,7 +14,8 @@
     "test-norpc": "node $NODE_DEBUG_OPTION ./node_modules/.bin/truffle test --noVMErrorsOnRPCResponse",
     "test": "run-with-testrpc -l 20000000 --noVMErrorsOnRPCResponse true 'truffle test'",
     "deploy-rinkeby": "node $NODE_DEBUG_OPTION ./node_modules/.bin/truffle migrate --reset --network kovan",
-    "console-rinkeby": "node $NODE_DEBUG_OPTION ./node_modules/.bin/truffle console --network rinkeby"
+    "console-rinkeby": "node $NODE_DEBUG_OPTION ./node_modules/.bin/truffle console --network rinkeby",
+    "init-contracts": "node $NODE_DEBUG_OPTION ./node_modules/.bin/truffle exec scripts/init_contracts.js --network mainnet"
   },
   "repository": {
     "type": "git",

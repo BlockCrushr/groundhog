@@ -2,7 +2,9 @@ pragma solidity ^0.5.0;
 pragma experimental ABIEncoderV2;
 
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
-import "./modules/MerchantModule.sol";
+import "./common/Enum.sol";
+import "./modules/interfaces/MerchantModule.sol";
+import "./modules/interfaces/SubscriptionModule.sol";
 
 contract BulkExecutor is Ownable {
 
@@ -43,24 +45,24 @@ contract BulkExecutor is Ownable {
                 )
             ) {
 
-//                if (value[i] == uint(0)) {
-//
-//                    address payable splitter;
-//                    bytes memory dataLocal = data[i];
-//                    // solium-disable-next-line security/no-inline-assembly
-//                    assembly {
-//                        splitter := div(mload(add(add(dataLocal, 0x20), 16)), 0x1000000000000000000000000)
-//                    }
-//
-//                    if ((MerchantModule(splitter).split(to[i]))) {
-//                        emit SuccessSplit();
-//                    }
-//
-//                } else {
-//                    if (MerchantModule(address(to[i])).split(address(0))) {
-//                        emit SuccessSplit();
-//                    }
-//                }
+                if (value[i] == uint(0)) {
+
+                    address payable splitter;
+                    bytes memory dataLocal = data[i];
+                    // solium-disable-next-line security/no-inline-assembly
+                    assembly {
+                        splitter := div(mload(add(add(dataLocal, 0x20), 16)), 0x1000000000000000000000000)
+                    }
+
+                    if ((MMInterface(splitter).split(to[i]))) {
+                        emit SuccessSplit();
+                    }
+
+                } else {
+                    if (MMInterface(address(to[i])).split(address(0))) {
+                        emit SuccessSplit();
+                    }
+                }
             }
             i++;
         }

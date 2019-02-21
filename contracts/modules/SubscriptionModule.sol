@@ -15,7 +15,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
     using BokkyPooBahsDateTimeLibrary for uint256;
     using DSMath for uint256;
     string public constant NAME = "Groundhog";
-    string public constant VERSION = "0.0.1";
+    string public constant VERSION = "0.1.0";
 
     bytes32 public domainSeparator;
     address public oracleRegistry;
@@ -60,6 +60,22 @@ contract SubscriptionModule is Module, SignatureDecoder {
         GEnum.SubscriptionStatus prev,
         GEnum.SubscriptionStatus next
     );
+
+    /// @dev update registry if needed, can only be called from a safe txn
+    function setRegistry(
+        address _oracleRegistry
+    )
+    authorized
+    public
+    {
+        require(
+            _oracleRegistry != address(0),
+            "SubscriptionModule::setRegistry: INVALID_STATE: ORACLE_REGISTRY_ZERO"
+        );
+
+        oracleRegistry = _oracleRegistry;
+    }
+
 
     /// @dev Setup function sets manager
     function setup(
@@ -771,6 +787,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
     public
     returns (uint256)
     {
+        //check to ensure this method doesn't actually get executed outside of a call function
         require(
             msg.sender == address(this),
             "SubscriptionModule::requiredTxGas: INVALID_DATA: MSG_SENDER"
