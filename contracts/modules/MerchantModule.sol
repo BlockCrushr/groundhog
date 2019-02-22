@@ -3,7 +3,7 @@ pragma solidity ^0.5.0;
 import "../base/Module.sol";
 import "./interfaces/SubscriptionModule.sol";
 import "../external/Math.sol";
-import "../OracleRegistry.sol";
+import "../interfaces/OracleRegistryI.sol";
 import "../common/SecuredTokenTransfer.sol";
 
 interface ERC20 {
@@ -29,13 +29,10 @@ contract MerchantModule is Module, SecuredTokenTransfer {
 
     using DSMath for uint256;
 
-    OracleRegistry public oracleRegistry;
+    OracleRegistryI public oracleRegistry;
 
-    event IncomingPayment(uint256 payment);
     event PaymentSent(address asset, address receiver, uint256 payment);
-    //    event LogUint(uint, string);
-    //    event LogAddress(address, string);
-    //    event LogBytes32(bytes32, string);
+
 
     function setup(address _oracleRegistry)
     public
@@ -45,14 +42,13 @@ contract MerchantModule is Module, SecuredTokenTransfer {
             address(oracleRegistry) == address(0),
             "MerchantModule::setup: INVALID_STATE: ORACLE_REGISTRY_SET"
         );
-        oracleRegistry = OracleRegistry(_oracleRegistry);
+        oracleRegistry = OracleRegistryI(_oracleRegistry);
     }
 
     function()
     payable
     external
     {
-        emit IncomingPayment(msg.value);
     }
 
     function split(
@@ -73,25 +69,19 @@ contract MerchantModule is Module, SecuredTokenTransfer {
 
             uint256 splitterBalanceStart = address(this).balance;
             if (splitterBalanceStart == 0) return false;
-            //            emit LogUint(splitterBalanceStart, "splitterBalanceStart");
             //
             uint256 fee = oracleRegistry.getNetworkFee(address(0));
-            //            emit LogUint(fee, "fee");
 
 
             uint256 networkBalanceStart = networkWallet.balance;
-            //            emit LogUint(networkBalanceStart, "networkBalanceStart");
 
             uint256 merchantBalanceStart = merchantWallet.balance;
 
-            //            emit LogUint(merchantBalanceStart, "merchantBalanceStart");
 
             uint256 networkSplit = splitterBalanceStart.wmul(fee);
-            //            emit LogUint(networkSplit, "networkSplit");
 
             uint256 merchantSplit = splitterBalanceStart.sub(networkSplit);
 
-            //            emit LogUint(merchantSplit, "merchantSplit");
 
             require(merchantSplit > networkSplit, "Split Math is Wrong");
             //pay network
@@ -114,26 +104,23 @@ contract MerchantModule is Module, SecuredTokenTransfer {
             ERC20 token = ERC20(tokenAddress);
 
             uint256 splitterBalanceStart = token.balanceOf(address(this));
-            //            emit LogUint(splitterBalanceStart, "splitterBalanceStart");
 
 
             if (splitterBalanceStart == 0) return false;
 
             uint256 fee = oracleRegistry.getNetworkFee(address(token));
 
-            //            emit LogUint(fee, "fee");
 
             uint256 merchantBalanceStart = token.balanceOf(merchantWallet);
 
-            //            emit LogUint(merchantBalanceStart, "merchantBalanceStart");
+            uint256 networkBalanceStart = token.balanceOf(networkWallet);
+
 
             uint256 networkSplit = splitterBalanceStart.wmul(fee);
 
-            //            emit LogUint(networkSplit, "networkSplit");
 
             uint256 merchantSplit = splitterBalanceStart.sub(networkSplit);
 
-            //            emit LogUint(merchantSplit, "merchantSplit");
 
             require(
                 networkSplit.add(merchantSplit) == splitterBalanceStart,
@@ -155,6 +142,13 @@ contract MerchantModule is Module, SecuredTokenTransfer {
                 "MerchantModule::withdraw: INVALID_EXEC TOKEN_MERCHANT_PAYOUT"
             );
             emit PaymentSent(address(token), merchantWallet, merchantSplit);
+
+            require(
+                (networkBalanceStart.add(networkSplit) == token.balanceOf(networkWallet))
+                &&
+                (merchantBalanceStart.add(merchantSplit) == token.balanceOf(merchantWallet)),
+                "MerchantModule::withdraw: INVALID_EXEC TOKEN_SPLIT_PAYOUT"
+            );
         }
         return true;
     }
@@ -165,13 +159,10 @@ contract MerchantModule is Module, SecuredTokenTransfer {
         address to,
         uint256 value,
         bytes memory data,
-        Enum.Operation operation,
-        uint256 safeTxGas,
-        uint256 dataGas,
-        uint256 gasPrice,
-        address gasToken,
-        address payable refundReceiver,
-        bytes memory meta,
+        uint256 period,
+        uint256 offChainId,
+        uint256 startDate,
+        uint256 endDate,
         bytes memory signatures
     )
     public
@@ -181,13 +172,10 @@ contract MerchantModule is Module, SecuredTokenTransfer {
             to,
             value,
             data,
-            operation,
-            safeTxGas,
-            dataGas,
-            gasPrice,
-            gasToken,
-            refundReceiver,
-            meta,
+            period,
+            offChainId,
+            startDate,
+            endDate,
             signatures
         );
     }

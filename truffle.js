@@ -30,7 +30,7 @@ module.exports = {
         return new HDWalletProvider(mnemonic, 'https://mainnet.infura.io/' + token)
       },
       network_id: '1',
-      gas: 2200000,
+      gas: 4200000,
       gasPrice: 31000000000, // 25 Gwei
     }
   },

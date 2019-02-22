@@ -9,13 +9,10 @@ contract ReEntryAttacker {
         address to;
         uint256 value;
         bytes data;
-        Enum.Operation operation;
-        uint256 safeTxGas;
-        uint256 dataGas;
-        uint256 gasPrice;
-        address gasToken;
-        address payable refundReceiver;
-        bytes meta;
+        uint256 period;
+        uint256 offChainId;
+        uint256 startDate;
+        uint256 endDate;
         bytes signatures;
     }
 
@@ -37,13 +34,10 @@ contract ReEntryAttacker {
         address payable to,
         uint256 value,
         bytes memory data,
-        Enum.Operation operation,
-        uint256 safeTxGas,
-        uint256 dataGas,
-        uint256 gasPrice,
-        address gasToken,
-        address payable refundReceiver,
-        bytes memory meta,
+        uint256 period,
+        uint256 offChainId,
+        uint256 startDate,
+        uint256 endDate,
         bytes memory signatures
     )
     public
@@ -53,26 +47,20 @@ contract ReEntryAttacker {
             to,
             value,
             data,
-            operation,
-            safeTxGas,
-            dataGas,
-            gasPrice,
-            gasToken,
-            refundReceiver,
-            meta
+            period,
+            offChainId,
+            startDate,
+            endDate
         );
 
         payloads[_activeAttack] = Payload(
             to,
             value,
             data,
-            operation,
-            safeTxGas,
-            dataGas,
-            gasPrice,
-            gasToken,
-            refundReceiver,
-            meta,
+            period,
+            offChainId,
+            startDate,
+            endDate,
             signatures
         );
 
@@ -81,13 +69,10 @@ contract ReEntryAttacker {
             to,
             value,
             data,
-            operation,
-            safeTxGas,
-            dataGas,
-            gasPrice,
-            gasToken,
-            refundReceiver,
-            meta,
+            period,
+            offChainId,
+            startDate,
+            endDate,
             signatures
         );
     }
@@ -103,13 +88,10 @@ contract ReEntryAttacker {
             _attack.to,
             _attack.value,
             _attack.data,
-            _attack.operation,
-            _attack.safeTxGas,
-            _attack.dataGas,
-            _attack.gasPrice,
-            _attack.gasToken,
-            _attack.refundReceiver,
-            _attack.meta,
+            _attack.period,
+            _attack.offChainId,
+            _attack.startDate,
+            _attack.endDate,
             _attack.signatures
         );
     }

@@ -13,9 +13,17 @@ contract GEnum {
 
     enum Period {
         INIT,
+        SECOND,
+        MINUTE,
+        HOUR,
         DAY,
         WEEK,
         MONTH,
-        YEAR
+        BI_WEEKLY,
+        THREE_MONTH,
+        SIX_MONTH,
+        YEAR,
+        TWO_YEAR,
+        THREE_YEAR
     }
 }

@@ -12,25 +12,19 @@ interface SM {
         address to,
         uint256 value,
         bytes calldata data,
-        Enum.Operation operation,
-        uint256 safeTxGas,
-        uint256 dataGas,
-        uint256 gasPrice,
-        address gasToken,
-        address payable refundReceiver,
-        bytes calldata meta,
+        uint256 period,
+        uint256 offChainId,
+        uint256 startDate,
+        uint256 endDate,
         bytes calldata signatures) external returns (bool);
 
     function cancelSubscriptionAsRecipient(
         address to,
         uint256 value,
         bytes calldata data,
-        Enum.Operation operation,
-        uint256 safeTxGas,
-        uint256 dataGas,
-        uint256 gasPrice,
-        address gasToken,
-        address payable refundReceiver,
-        bytes calldata meta,
+        uint256 period,
+        uint256 offChainId,
+        uint256 startDate,
+        uint256 endDate,
         bytes calldata signatures) external returns (bool);
 }

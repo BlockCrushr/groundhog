@@ -9,18 +9,18 @@ import "./modules/interfaces/SubscriptionModule.sol";
 contract BulkExecutor is Ownable {
 
 
-    event SuccessSplit();
+    event SuccessSplit(address merchantModule);
 
     function execute(
         address[] memory customers,
         address payable[] memory to,
         uint256[] memory value,
         bytes[] memory data,
-        Enum.Operation[] memory operation,
-        uint256[][3] memory gasInfo, //0 txgas 1dataGas 2 gasPrice
-        address[] memory gasToken,
-        address payable[] memory refundReceiver,
-        bytes[][2] memory metaSig
+        uint256[] memory period,
+        uint256[] memory offChainId,
+        uint256[] memory startDate,
+        uint256[] memory endDate,
+        bytes[] memory sig
     )
     public
     returns (
@@ -28,43 +28,64 @@ contract BulkExecutor is Ownable {
     )
     {
         i = 0;
+        bool[] memory toSplit = new bool[](customers.length);
 
         while (i < customers.length) {
             if (SM(customers[i]).execSubscription(
                     to[i],
                     value[i],
                     data[i],
-                    operation[i],
-                    gasInfo[i][0], //txgas
-                    gasInfo[i][1], //datagas
-                    gasInfo[i][2], //gasPrice
-                    gasToken[i],
-                    refundReceiver[i],
-                    metaSig[i][0], //meta
-                    metaSig[i][1]  //sigs
+                    period[i],
+                    offChainId[i],
+                    startDate[i],
+                    endDate[i],
+                    sig[i]
                 )
             ) {
-
-                if (value[i] == uint(0)) {
-
-                    address payable splitter;
-                    bytes memory dataLocal = data[i];
-                    // solium-disable-next-line security/no-inline-assembly
-                    assembly {
-                        splitter := div(mload(add(add(dataLocal, 0x20), 16)), 0x1000000000000000000000000)
-                    }
-
-                    if ((MMInterface(splitter).split(to[i]))) {
-                        emit SuccessSplit();
-                    }
-
-                } else {
-                    if (MMInterface(address(to[i])).split(address(0))) {
-                        emit SuccessSplit();
-                    }
-                }
+                toSplit[i] = true;
+            } else {
+                toSplit[i] = false;
             }
             i++;
+
+        }
+
+        i = 0;
+        for (uint t=0; t < toSplit.length; t++) {
+
+            if (toSplit[t]) {
+
+                uint256 _value = value[t];
+
+                address payable merchant;
+                address asset;
+
+                //value of 0 means its paying via some smart contract(erc20 token, etc)
+                if (_value == uint(0)) {
+                    bytes memory _data = data[t];
+
+                    // extract the merchant from the data payload
+
+                    // solium-disable-next-line security/no-inline-assembly
+                    assembly {
+                        merchant := div(mload(add(add(_data, 0x20), 16)), 0x1000000000000000000000000)
+                    }
+
+                    //smart contract for the token
+                    asset = to[t];
+
+                } else {
+
+                    merchant = to[t];
+                    asset = address(0);
+                    //the split is eth, so the _to address is the actual receiving contract
+                }
+
+                if (MMInterface(merchant).split(asset)) {
+                    emit SuccessSplit(merchant);
+                    i++;
+                }
+            }
         }
     }
 }

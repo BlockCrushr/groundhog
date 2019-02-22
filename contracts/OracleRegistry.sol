@@ -1,15 +1,16 @@
 pragma solidity ^0.5.0;
 
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
+import "./interfaces/OracleRegistryI.sol";
 
-interface DSFeed {
+interface DSFeedI {
     function read()
     external
     view
     returns (bytes32);
 }
 
-contract OracleRegistry is Ownable {
+contract OracleRegistry is OracleRegistryI, Ownable {
 
 
     address payable private _networkWallet;
@@ -81,7 +82,7 @@ contract OracleRegistry is Ownable {
     ) public view returns (bytes32) {
         address orl = oracles[currencyPair];
         require(isWhitelisted[orl], "INVALID_DATA: CURRENCY_PAIR");
-        return DSFeed(orl).read();
+        return DSFeedI(orl).read();
     }
 
     /// @dev Allows to add destination to whitelist. This can only be done via a Safe transaction.
@@ -110,18 +111,21 @@ contract OracleRegistry is Ownable {
 
     function getNetworkExecutor()
     public
+    view
     returns (address) {
         return _networkExecutor;
     }
 
     function getNetworkWallet()
     public
+    view
     returns (address payable) {
         return _networkWallet;
     }
 
     function getNetworkFee(address asset)
     public
+    view
     returns (uint256 fee) {
         fee = splitterToFee[msg.sender][asset];
         if (fee == uint256(0)) {
