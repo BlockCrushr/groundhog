@@ -140,12 +140,13 @@ const shouldFailWithMessage = async (promise, message) => {
         await promise;
     } catch (error) {
         if (message) {
-            assert.ok(error.message.search(message) > 0)
+            if (error.message.search(message) > 0) {
+                return assert.ok(true);
+            }
         }
-        return;
     }
 
-    assert.fail('Expected failure not received');
+    assert.fail(`Expected ${message} not received`);
 }
 
 async function getErrorMessage(to, value, data, from) {

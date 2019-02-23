@@ -16,10 +16,10 @@ contract BulkExecutor is Ownable {
         address payable[] memory to,
         uint256[] memory value,
         bytes[] memory data,
-        uint256[] memory period,
-        uint256[] memory offChainId,
+        uint8[] memory period,
         uint256[] memory startDate,
         uint256[] memory endDate,
+        uint256[] memory uniqId,
         bytes[] memory sig
     )
     public
@@ -29,29 +29,37 @@ contract BulkExecutor is Ownable {
     {
         i = 0;
         bool[] memory toSplit = new bool[](customers.length);
-
+        address[2] memory holder;
         while (i < customers.length) {
+            toSplit[i] = false;
+            require(customers[i] >= holder[0], "SORT CUSTOMERS ASC");
+            if (customers[i] > holder[0]) {
+                holder[1] = address(0x1);
+                //SENTINEL_RESET
+            }
             if (SM(customers[i]).execSubscription(
                     to[i],
                     value[i],
                     data[i],
                     period[i],
-                    offChainId[i],
                     startDate[i],
                     endDate[i],
+                    uniqId[i],
                     sig[i]
                 )
             ) {
-                toSplit[i] = true;
-            } else {
-                toSplit[i] = false;
+                if (to[i] != holder[1]) {
+                    toSplit[i] = true;
+                }
             }
+
+            holder[1] = to[i];
             i++;
 
         }
 
         i = 0;
-        for (uint t=0; t < toSplit.length; t++) {
+        for (uint t = 0; t < toSplit.length; t++) {
 
             if (toSplit[t]) {
 
@@ -87,5 +95,17 @@ contract BulkExecutor is Ownable {
                 }
             }
         }
+    }
+
+
+    function manualSplit(
+        address merchant,
+        address asset
+    )
+    public
+    returns (
+        bool success
+    ) {
+        return MMInterface(merchant).split(asset);
     }
 }

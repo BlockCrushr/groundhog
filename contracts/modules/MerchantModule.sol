@@ -33,7 +33,13 @@ contract MerchantModule is Module, SecuredTokenTransfer {
 
     event PaymentSent(address asset, address receiver, uint256 payment);
 
-
+    modifier onlyExecutor() {
+        require(
+            msg.sender == oracleRegistry.getNetworkExecutor(),
+            "MerchantModule::split: INVALID_DATA: MSG_SENDER_NOT_EXECUTOR"
+        );
+        _;
+    }
     function setup(address _oracleRegistry)
     public
     {
@@ -55,12 +61,10 @@ contract MerchantModule is Module, SecuredTokenTransfer {
         address tokenAddress
     )
     public
+    onlyExecutor
     returns (bool)
     {
-        require(
-            msg.sender == oracleRegistry.getNetworkExecutor(),
-            "MerchantModule::split: INVALID_DATA: MSG_SENDER_NOT_EXECUTOR"
-        );
+
 
         address payable networkWallet = oracleRegistry.getNetworkWallet();
         address payable merchantWallet = address(manager);
@@ -83,7 +87,7 @@ contract MerchantModule is Module, SecuredTokenTransfer {
             uint256 merchantSplit = splitterBalanceStart.sub(networkSplit);
 
 
-            require(merchantSplit > networkSplit, "Split Math is Wrong");
+            require(merchantSplit > networkSplit, "SPLIT MATH IS INCORRECT");
             //pay network
 
             networkWallet.transfer(networkSplit);
@@ -93,6 +97,7 @@ contract MerchantModule is Module, SecuredTokenTransfer {
             merchantWallet.transfer(merchantSplit);
             emit PaymentSent(address(0x0), merchantWallet, merchantSplit);
 
+            require(address(this).balance == 0, "BALANCE NOT ZERO");
             require(
                 (networkBalanceStart.add(networkSplit) == networkWallet.balance)
                 &&
@@ -104,7 +109,6 @@ contract MerchantModule is Module, SecuredTokenTransfer {
             ERC20 token = ERC20(tokenAddress);
 
             uint256 splitterBalanceStart = token.balanceOf(address(this));
-
 
             if (splitterBalanceStart == 0) return false;
 
@@ -143,7 +147,9 @@ contract MerchantModule is Module, SecuredTokenTransfer {
             );
             emit PaymentSent(address(token), merchantWallet, merchantSplit);
 
-            require(
+            require(token.balanceOf(address(this)) == 0, "BALANCE NOT ZERO");
+
+        require(
                 (networkBalanceStart.add(networkSplit) == token.balanceOf(networkWallet))
                 &&
                 (merchantBalanceStart.add(merchantSplit) == token.balanceOf(merchantWallet)),
@@ -159,10 +165,10 @@ contract MerchantModule is Module, SecuredTokenTransfer {
         address to,
         uint256 value,
         bytes memory data,
-        uint256 period,
-        uint256 offChainId,
+        uint8 period,
         uint256 startDate,
         uint256 endDate,
+        uint256 uniqId,
         bytes memory signatures
     )
     public
@@ -173,9 +179,9 @@ contract MerchantModule is Module, SecuredTokenTransfer {
             value,
             data,
             period,
-            offChainId,
             startDate,
             endDate,
+            uniqId,
             signatures
         );
     }

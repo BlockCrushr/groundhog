@@ -9,8 +9,8 @@ contract ReEntryAttacker {
         address to;
         uint256 value;
         bytes data;
-        uint256 period;
-        uint256 offChainId;
+        uint8 period;
+        uint256 uniqId;
         uint256 startDate;
         uint256 endDate;
         bytes signatures;
@@ -34,10 +34,10 @@ contract ReEntryAttacker {
         address payable to,
         uint256 value,
         bytes memory data,
-        uint256 period,
-        uint256 offChainId,
+        uint8 period,
         uint256 startDate,
         uint256 endDate,
+        uint256 uniqId,
         bytes memory signatures
     )
     public
@@ -48,9 +48,9 @@ contract ReEntryAttacker {
             value,
             data,
             period,
-            offChainId,
             startDate,
-            endDate
+            endDate,
+            uniqId
         );
 
         payloads[_activeAttack] = Payload(
@@ -58,9 +58,10 @@ contract ReEntryAttacker {
             value,
             data,
             period,
-            offChainId,
             startDate,
             endDate,
+            uniqId,
+
             signatures
         );
 
@@ -70,9 +71,10 @@ contract ReEntryAttacker {
             value,
             data,
             period,
-            offChainId,
             startDate,
             endDate,
+            uniqId,
+
             signatures
         );
     }
@@ -89,9 +91,9 @@ contract ReEntryAttacker {
             _attack.value,
             _attack.data,
             _attack.period,
-            _attack.offChainId,
             _attack.startDate,
             _attack.endDate,
+            _attack.uniqId,
             _attack.signatures
         );
     }

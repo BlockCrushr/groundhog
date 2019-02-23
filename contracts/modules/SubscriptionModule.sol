@@ -13,6 +13,7 @@ import "../interfaces/OracleRegistryI.sol";
 /// @author Andrew Redden - <andrew@groundhog.network>
 contract SubscriptionModule is Module, SignatureDecoder {
 
+
     using BokkyPooBahsDateTimeLibrary for uint256;
     using DSMath for uint256;
 
@@ -28,14 +29,19 @@ contract SubscriptionModule is Module, SignatureDecoder {
     bytes32 public constant DOMAIN_SEPARATOR_TYPEHASH = 0x035aff83d86937d35b32e04f0ddc6ff469290eef2f1b692d8a815c89404d4749;
 
     //keccak256(
-    //  "SafeSubTx(address to,uint256 value,bytes data,uint256 period,uint256 offChainId,uint256 startDate,uint256 endDate)"
+    //  "EIP1337Execute(address to,uint256 value,bytes data,uint8 period,uint256 startDate,uint256 endDate,uint256 uniqId)"
     //)
-    bytes32 public constant SAFE_SUB_TX_TYPEHASH = 0xf8207fce540d9855877370622cd6f44a2957f5cbf5058d3e81654c8c2e88eca6;
+    bytes32 public constant EIP1337_TYPEHASH = 0xfb712ff729dee2cfef270710d9358c6b90f95803526927d0f046a957b02071ae;
+
+    //    //keccak256(
+    //    //  "EIP1337Execute(address to,uint256 value,bytes data,uint8 period,uint8 rate,uint256 startDate,uint256 endDate,uint256 uniqId)"
+    //    //)
+    //    bytes32 public constant EIP1337_TYPEHASH = 0x42d388c264cfbbed274909b3cf362a96c5cf9b2cd6733165cb9a8bb92b532098;
 
     //keccak256(
-    //  "SafeSubCancelTx(bytes32 subscriptionHash,string action)"
+    //  "EIP1337Action(bytes32 subscriptionHash,string action)"
     //)
-    bytes32 public constant SAFE_SUB_CANCEL_TX_TYPEHASH = 0xef5a0c558cb538697e29722572248a2340a367e5079b08a00b35ef5dd1e66faa;
+    bytes32 public constant EIP1337_ACTION_TYPEHASH = 0x98c669e75fc9074217ec4f5c9c90babd89fd441cbf72df46c51dc164302d29a6;
 
     mapping(bytes32 => Meta) public subscriptions;
 
@@ -96,7 +102,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
     /// @param value Ether value of Safe transaction.
     /// @param data Data payload of Safe transaction.
     /// @param period uint256
-    /// @param offChainId uint256
+    /// @param uniqId uint256
     /// @param startDate uint256
     /// @param endDate uint256
     /// @param signatures Packed signature data ({bytes32 r}{bytes32 s}{uint2568 v})
@@ -105,10 +111,10 @@ contract SubscriptionModule is Module, SignatureDecoder {
         address to,
         uint256 value,
         bytes memory data,
-        uint256 period,
-        uint256 offChainId,
+        uint8 period,
         uint256 startDate,
         uint256 endDate,
+        uint256 uniqId,
         bytes memory signatures
     )
     public
@@ -123,9 +129,9 @@ contract SubscriptionModule is Module, SignatureDecoder {
             value,
             data,
             period,
-            offChainId,
             startDate,
-            endDate
+            endDate,
+            uniqId
         );
 
         require(
@@ -142,9 +148,9 @@ contract SubscriptionModule is Module, SignatureDecoder {
             data,
             keccak256(subHashData),
             period,
-            offChainId,
             startDate,
-            endDate
+            endDate,
+            uniqId
         );
     }
 
@@ -155,10 +161,10 @@ contract SubscriptionModule is Module, SignatureDecoder {
         uint256 value,
         bytes memory data,
         bytes32 subscriptionHash,
-        uint256 period,
-        uint256 offChainId,
+        uint8 period,
         uint256 startDate,
-        uint256 endDate
+        uint256 endDate,
+        uint256 uniqId
     )
     internal
     returns (bool processPayment)
@@ -168,15 +174,15 @@ contract SubscriptionModule is Module, SignatureDecoder {
         processPayment = _processSub(
             subscriptionHash,
             period,
-            offChainId,
             startDate,
-            endDate
+            endDate,
+            uniqId
         );
 
         if (processPayment) {
 
             uint256 conversionRate;
-            if (value != 0 && (data.length == 32)) { //find a better type identifier to show these, first x bytes are something
+            if (value != 0 && (data.length == 32)) {//find a better type identifier to show these, first x bytes are something
                 //if its 32 exactly, its likely just the one uint256, which means this is not a function call
 
                 uint256 oracleFeed = abi.decode(
@@ -327,19 +333,23 @@ contract SubscriptionModule is Module, SignatureDecoder {
         address to,
         uint256 value,
         bytes memory data,
-        uint256 period,
-        uint256 offChainId,
+        uint8 period,
         uint256 startDate,
         uint256 endDate,
+        uint256 uniqId,
         bytes memory signatures
     )
     public
     returns (bool cancelled) {
 
-
         bytes memory subHashData = encodeSubscriptionData(
-            to, value, data,
-            period, offChainId, startDate, endDate
+            to,
+            value,
+            data,
+            period,
+            startDate,
+            endDate,
+            uniqId
         );
 
         require(
@@ -347,20 +357,17 @@ contract SubscriptionModule is Module, SignatureDecoder {
             "SubscriptionModule::cancelSubscriptionAsRecipient: INVALID_DATA: SIGNATURES"
         );
 
-        //if no value, assume its an ERC20 token, remove the to argument from the data
+        address recipient = to;
+//        if no value, assume its an ERC20 token, remove the to argument from the data
         if (value == uint(0)) {
 
-            address recipient;
             // solium-disable-next-line security/no-inline-assembly
             assembly {
                 recipient := div(mload(add(add(data, 0x20), 16)), 0x1000000000000000000000000)
             }
-            require(msg.sender == recipient, "SubscriptionModule::isRecipient: MSG_SENDER_NOT_RECIPIENT_ERC");
-        } else {
-
-            //we are sending ETH, so check the sender matches to argument
-            require(msg.sender == to, "SubscriptionModule::isRecipient: MSG_SENDER_NOT_RECIPIENT_ETH");
         }
+
+        require(msg.sender == recipient, "SubscriptionModule::isRecipient: MSG_SENDER_NOT_RECIPIENT");
 
         cancelled = _cancelSubscription(keccak256(subHashData));
 
@@ -427,10 +434,10 @@ contract SubscriptionModule is Module, SignatureDecoder {
     /// @return bool
     function _processSub(
         bytes32 subscriptionHash,
-        uint256 period,
-        uint256 offChainID,
+        uint8 period,
         uint256 startDate,
-        uint256 endDate
+        uint256 endDate,
+        uint256 uniqId
     )
     internal
     returns (bool processPayment)
@@ -539,7 +546,6 @@ contract SubscriptionModule is Module, SignatureDecoder {
             period == uint256(GEnum.Period.MONTH)
         ) {
             withdrawHolder = BokkyPooBahsDateTimeLibrary.addMonths(sub.nextWithdraw, 1);
-
         } else if (
             period == uint256(GEnum.Period.THREE_MONTH)
         ) {
@@ -599,10 +605,10 @@ contract SubscriptionModule is Module, SignatureDecoder {
         address to,
         uint256 value,
         bytes memory data,
-        uint256 period,
-        uint256 offChainId,
+        uint8 period,
         uint256 startDate,
-        uint256 endDate
+        uint256 endDate,
+        uint256 uniqId
     )
     public
     view
@@ -614,9 +620,9 @@ contract SubscriptionModule is Module, SignatureDecoder {
                 value,
                 data,
                 period,
-                offChainId,
                 startDate,
-                endDate
+                endDate,
+                uniqId
             )
         );
     }
@@ -631,9 +637,9 @@ contract SubscriptionModule is Module, SignatureDecoder {
     returns (bytes32)
     {
 
-        bytes32 safeSubCancelTxHash = keccak256(
+        bytes32 eip1337ActionHash = keccak256(
             abi.encode(
-                SAFE_SUB_CANCEL_TX_TYPEHASH,
+                EIP1337_ACTION_TYPEHASH,
                 subscriptionHash,
                 keccak256(abi.encodePacked(action))
             )
@@ -644,7 +650,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
                 byte(0x19),
                 byte(0x01),
                 domainSeparator,
-                safeSubCancelTxHash
+                eip1337ActionHash
             )
         );
     }
@@ -659,25 +665,25 @@ contract SubscriptionModule is Module, SignatureDecoder {
         address to,
         uint256 value,
         bytes memory data,
-        uint256 period,
-        uint256 offChainId,
+        uint8 period,
         uint256 startDate,
-        uint256 endDate
+        uint256 endDate,
+        uint256 uniqId
     )
     public
     view
     returns (bytes memory)
     {
-        bytes32 safeSubTxHash = keccak256(
+        bytes32 eip1337TxHash = keccak256(
             abi.encode(
-                SAFE_SUB_TX_TYPEHASH,
+                EIP1337_TYPEHASH,
                 to,
                 value,
                 keccak256(data),
                 period,
-                offChainId,
                 startDate,
-                endDate
+                endDate,
+                uniqId
             )
         );
 
@@ -685,7 +691,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
             byte(0x19),
             byte(0x01),
             domainSeparator,
-            safeSubTxHash
+            eip1337TxHash
         );
     }
 }

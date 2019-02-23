@@ -63,37 +63,37 @@ contract('SubscriptionModule', async (accounts) => {
         value,
         data,
         period,
-        offChainId,
         startDate,
-        endDate
+        endDate,
+        uniqId
     ) => {
         let typedData = {
             types: {
                 EIP712Domain: [
                     {type: "address", name: "verifyingContract"}
                 ],
-                SafeSubTx: [
+                EIP1337Execute: [
                     {type: "address", name: "to"},
                     {type: "uint256", name: "value"},
                     {type: "bytes", name: "data"},
-                    {type: "uint256", name: "period"},
-                    {type: "uint256", name: "offChainId"},
+                    {type: "uint8", name: "period"},
                     {type: "uint256", name: "startDate"},
                     {type: "uint256", name: "endDate"},
+                    {type: "uint256", name: "uniqId"}
                 ]
             },
             domain: {
                 verifyingContract: subscriptionModule.options.address
             },
-            primaryType: "SafeSubTx",
+            primaryType: "EIP1337Execute",
             message: {
                 to: to,
                 value: value,
                 data: data,
                 period: period,
-                offChainId: offChainId,
                 startDate: startDate,
-                endDate: endDate
+                endDate: endDate,
+                uniqId: uniqId
             }
         };
 
@@ -115,7 +115,7 @@ contract('SubscriptionModule', async (accounts) => {
                     {type: "address", name: "verifyingContract"}
                 ],
                 //"SafeSubCancelTx(bytes32 subscriptionHash, string action)"
-                SafeSubCancelTx: [
+                EIP1337Action: [
                     {type: "bytes32", name: "subscriptionHash"},
                     {type: "string", name: "action"},
                 ]
@@ -123,7 +123,7 @@ contract('SubscriptionModule', async (accounts) => {
             domain: {
                 verifyingContract: subscriptionModule.options.address
             },
-            primaryType: "SafeSubCancelTx",
+            primaryType: "EIP1337Action",
             message: {
                 subscriptionHash: subscriptionHash,
                 action: "cancel"
@@ -210,10 +210,7 @@ contract('SubscriptionModule', async (accounts) => {
         let options = opts || {
             fails: false,
             meta: {
-                period: 4,
-                offChainId: 0,
-                startDate: 0,
-                endDate: 0
+
             },
             noExec: false
         };
@@ -228,9 +225,9 @@ contract('SubscriptionModule', async (accounts) => {
             value,
             data,
             options.meta.period,
-            options.meta.offChainId,
             options.meta.startDate,
-            options.meta.endDate
+            options.meta.endDate,
+            options.meta.uniqId
         );
 
 
@@ -244,9 +241,9 @@ contract('SubscriptionModule', async (accounts) => {
                 value,
                 data,
                 options.meta.period,
-                options.meta.offChainId,
                 options.meta.startDate,
                 options.meta.endDate,
+                options.meta.uniqId,
                 sigs
             ).send({
                 from: executor,
@@ -259,9 +256,9 @@ contract('SubscriptionModule', async (accounts) => {
                     value,
                     data,
                     options.meta.period,
-                    options.meta.offChainId,
                     options.meta.startDate,
-                    options.meta.endDate
+                    options.meta.endDate,
+                    options.meta.uniqId
                 );
 
                 assert.equal(
@@ -278,9 +275,9 @@ contract('SubscriptionModule', async (accounts) => {
                 value,
                 data,
                 period: options.meta.period,
-                offChainId: options.meta.offChainId,
                 startDate: options.meta.startDate,
                 endDate: options.meta.endDate,
+                uniqId: options.meta.uniqId,
                 sigs
             }
         }
@@ -464,7 +461,6 @@ contract('SubscriptionModule', async (accounts) => {
     })
 
 
-
     it('should deposit 1.1 ETH, create a $50 USD subscription, and then cancel the subscription before it even gets activated with meta txn workflow', async () => {
         // Deposit 1 ETH + some spare money for execution
         assert.equal(await web3.eth.getBalance(gnosisSafe.options.address), 0)
@@ -480,8 +476,8 @@ contract('SubscriptionModule', async (accounts) => {
             confirmingAccounts,
             receiver,
             web3.utils.toWei('50', 'ether'),
-            web3.utils.fromAscii('ethusd'),
-            0,
+            oracle,
+            4,
             0,
             0,
             0
@@ -492,8 +488,8 @@ contract('SubscriptionModule', async (accounts) => {
         let subscriptionHash = await subscriptionModule.methods.getSubscriptionHash(
             receiver,
             web3.utils.toWei('50', 'ether'),
-            web3.utils.fromAscii('ethusd'),
-            0,
+            oracle,
+            4,
             0,
             0,
             0
@@ -513,8 +509,8 @@ contract('SubscriptionModule', async (accounts) => {
             subscriptionModule.methods.execSubscription(
                 receiver,
                 web3.utils.toWei('50', 'ether'),
-                web3.utils.fromAscii('ethusd'),
-                0,
+                oracle,
+                4,
                 0,
                 0,
                 0,
@@ -526,7 +522,6 @@ contract('SubscriptionModule', async (accounts) => {
             "INVALID_STATE: SUB_STATUS"
         );
     });
-
 
 
     it('generate a subscription hash, process it, and then cancel it as the recipient', async () => {
@@ -549,10 +544,10 @@ contract('SubscriptionModule', async (accounts) => {
             oracle,
             {
                 meta: {
-                    period: 4, //period
-                    offChainId: 1, //
+                    period: 4,
                     startDate: 0,
-                    endDate: 0
+                    endDate: 0,
+                    uniqId: 1
                 }
             }
         );
@@ -561,12 +556,12 @@ contract('SubscriptionModule', async (accounts) => {
             to,
             value,
             data,
-            operation,
             period,
-            offChainId,
             startDate,
             endDate,
-            sigs
+            uniqId,
+            sigs,
+
         } = resp1.dataFields
 
         let merchantNonce = await merchantSafe.methods.nonce().call();
@@ -577,9 +572,9 @@ contract('SubscriptionModule', async (accounts) => {
             value,
             data,
             period,
-            offChainId,
             startDate,
             endDate,
+            uniqId,
             sigs
         ).encodeABI();
 
@@ -624,10 +619,10 @@ contract('SubscriptionModule', async (accounts) => {
                 oracle,
                 {
                     meta: {
-                        period: 4, //period
-                        offChainId: 1, //
-                        startDate: 0,
-                        endDate: 0
+                        period: period,
+                        startDate: startDate,
+                        endDate: endDate,
+                        uniqId: uniqId
                     }
                 }
             ), "INVALID_STATE: SUB_STATUS");
@@ -658,9 +653,9 @@ contract('SubscriptionModule', async (accounts) => {
             value = [],
             data = [],
             period = [],
-            offChainId = [], //0 txgas 1dataGas 2 gasPrice
             startDate = [],
             endDate = [],
+            uniqId = [],
             sig = [];
 
 
@@ -678,7 +673,7 @@ contract('SubscriptionModule', async (accounts) => {
             {
                 meta: {
                     period: 4, //period day
-                    offChainId: 1, //
+                    uniqId: 1, //
                     startDate: 0,
                     endDate: 0
                 },
@@ -691,9 +686,9 @@ contract('SubscriptionModule', async (accounts) => {
         value.push(resp1.dataFields.value);
         data.push(resp1.dataFields.data);
         period.push(resp1.dataFields.period);
-        offChainId.push(resp1.dataFields.offChainId);
         startDate.push(resp1.dataFields.startDate);
         endDate.push(resp1.dataFields.endDate);
+        uniqId.push(resp1.dataFields.uniqId);
         sig.push(resp1.dataFields.sigs);
 
         let resp2 = await executeSubscriptionWithSigner(
@@ -706,13 +701,12 @@ contract('SubscriptionModule', async (accounts) => {
             {
                 meta: {
                     period: 4,
-                    offChainId: 2,
+                    uniqId: 2,
                     startDate: 0,
                     endDate: 0 //slot 5
                 },
                 noExec: true
             }
-
         );
 
         customers.push(subscriptionModule.options.address);
@@ -720,9 +714,10 @@ contract('SubscriptionModule', async (accounts) => {
         value.push(resp2.dataFields.value);
         data.push(resp2.dataFields.data);
         period.push(resp2.dataFields.period);
-        offChainId.push(resp2.dataFields.offChainId);
         startDate.push(resp2.dataFields.startDate);
         endDate.push(resp2.dataFields.endDate);
+        uniqId.push(resp2.dataFields.uniqId);
+
         sig.push(resp2.dataFields.sigs);
 
 
@@ -735,9 +730,9 @@ contract('SubscriptionModule', async (accounts) => {
             value,
             data,
             period,
-            offChainId, //0 txgas 1dataGas 2 gasPrice
             startDate,
             endDate,
+            uniqId,
             sig
         ).send({from: accounts[0], gasLimit: 8000000})
 
@@ -766,9 +761,9 @@ contract('SubscriptionModule', async (accounts) => {
             web3.utils.toWei('0.5', 'ether'),
             "0x",
             4,
-            1,
             0,
             0,
+            1
         );
 
 
@@ -783,9 +778,9 @@ contract('SubscriptionModule', async (accounts) => {
             web3.utils.toWei('0.5', 'ether'),
             "0x",
             4,
+            0,
+            0,
             1,
-            0,
-            0,
             subSig
         ).send({
             from: executor,
@@ -837,7 +832,7 @@ contract('SubscriptionModule', async (accounts) => {
             {
                 meta: {
                     period: 4, //period
-                    offChainId: 1, //
+                    uniqId: 1, //
                     startDate: 0,
                     endDate: 0
                 }
@@ -853,9 +848,9 @@ contract('SubscriptionModule', async (accounts) => {
             value,
             data,
             period,
-            offChainId,
             startDate,
-            endDate
+            endDate,
+            uniqId,
         } = dataFields;
 
         let walletBalanceAfter = await web3.eth.getBalance(
@@ -868,9 +863,9 @@ contract('SubscriptionModule', async (accounts) => {
             value,
             data,
             period,
-            offChainId,
             startDate,
-            endDate
+            endDate,
+            uniqId
         ).call();
 
         let doubleSigs = await subSigner(
@@ -879,9 +874,9 @@ contract('SubscriptionModule', async (accounts) => {
             (value * 2).toString(),
             data,
             period,
-            offChainId,
             startDate,
-            endDate
+            endDate,
+            uniqId
         )
 
         let subhashDoubleData = await subscriptionModule.methods.execSubscription(
@@ -889,9 +884,9 @@ contract('SubscriptionModule', async (accounts) => {
             (value * 2).toString(),
             data,
             period,
-            offChainId,
             startDate,
             endDate,
+            uniqId,
             doubleSigs
         ).encodeABI();
 
@@ -1003,7 +998,7 @@ contract('SubscriptionModule', async (accounts) => {
                 {
                     meta: {
                         period: 4, //period
-                        offChainId: 1, //
+                        uniqId: 1, //
                         startDate: 0,
                         endDate: 0
                     }
@@ -1038,7 +1033,7 @@ contract('SubscriptionModule', async (accounts) => {
             {
                 meta: {
                     period: 4, //period
-                    offChainId: 1, //
+                    uniqId: 1, //
                     startDate: 0,
                     endDate: 0
                 }
@@ -1071,7 +1066,7 @@ contract('SubscriptionModule', async (accounts) => {
             {
                 meta: {
                     period: 4, //period
-                    offChainId: 1, //
+                    uniqId: 1, //
                     startDate: 0,
                     endDate: 0
                 }
@@ -1122,7 +1117,7 @@ contract('SubscriptionModule', async (accounts) => {
             {
                 meta: {
                     period: 4, //period
-                    offChainId: 1, //
+                    uniqId: 1, //
                     startDate: 0,
                     endDate: 0
                 }
@@ -1155,7 +1150,7 @@ contract('SubscriptionModule', async (accounts) => {
             {
                 meta: {
                     period: 4, //period
-                    offChainId: 1, //
+                    uniqId: 1, //
                     startDate: 0,
                     endDate: 0
                 }
@@ -1204,7 +1199,7 @@ contract('SubscriptionModule', async (accounts) => {
             {
                 meta: {
                     period: 4, //period
-                    offChainId: 1, //
+                    uniqId: 1, //
                     startDate: 0,
                     endDate: 0
                 }
@@ -1257,7 +1252,7 @@ contract('SubscriptionModule', async (accounts) => {
             {
                 meta: {
                     period: 4, //period
-                    offChainId: 1, //
+                    uniqId: 1, //
                     startDate: 0,
                     endDate: 0
                 }
@@ -1295,7 +1290,7 @@ contract('SubscriptionModule', async (accounts) => {
             {
                 meta: {
                     period: 4, //period
-                    offChainId: 1, //
+                    uniqId: 1, //
                     startDate: 0,
                     endDate: 0
                 }
@@ -1326,7 +1321,7 @@ contract('SubscriptionModule', async (accounts) => {
                 {
                     meta: {
                         period: 4, //period
-                        offChainId: 1, //
+                        uniqId: 1, //
                         startDate: 0,
                         endDate: 0
                     }
