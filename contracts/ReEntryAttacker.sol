@@ -1,7 +1,7 @@
 pragma solidity ^0.5.0;
 
-import "./common/Enum.sol";
-import "./modules/SubscriptionModule.sol";
+import "./common/GEnum.sol";
+import "./modules/interfaces/SubscriptionModule.sol";
 
 contract ReEntryAttacker {
 
@@ -9,8 +9,8 @@ contract ReEntryAttacker {
         address to;
         uint256 value;
         bytes data;
-        uint8 period;
-        uint256 uniqId;
+        GEnum.Period period;
+        uint256 unique;
         uint256 startDate;
         uint256 endDate;
         bytes signatures;
@@ -34,23 +34,23 @@ contract ReEntryAttacker {
         address payable to,
         uint256 value,
         bytes memory data,
-        uint8 period,
+        GEnum.Period period,
         uint256 startDate,
         uint256 endDate,
-        uint256 uniqId,
+        uint256 unique,
         bytes memory signatures
     )
     public
     {
-        bytes32 _activeAttack = SubscriptionModule(subModule)
-        .getSubscriptionHash(
+        bytes32 _activeAttack = SM(subModule)
+        .getHash(
             to,
             value,
             data,
             period,
             startDate,
             endDate,
-            uniqId
+            unique
         );
 
         payloads[_activeAttack] = Payload(
@@ -60,21 +60,19 @@ contract ReEntryAttacker {
             period,
             startDate,
             endDate,
-            uniqId,
-
+            unique,
             signatures
         );
 
-        SubscriptionModule(subModule)
-        .execSubscription(
+        SM(subModule)
+        .execute(
             to,
             value,
             data,
             period,
             startDate,
             endDate,
-            uniqId,
-
+            unique,
             signatures
         );
     }
@@ -85,15 +83,15 @@ contract ReEntryAttacker {
 
         Payload storage _attack = payloads[activeAttack];
 
-        SubscriptionModule(subModule)
-        .execSubscription(
+        SM(subModule)
+        .execute(
             _attack.to,
             _attack.value,
             _attack.data,
             _attack.period,
             _attack.startDate,
             _attack.endDate,
-            _attack.uniqId,
+            _attack.unique,
             _attack.signatures
         );
     }

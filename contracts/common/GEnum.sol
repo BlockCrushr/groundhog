@@ -3,7 +3,7 @@ pragma solidity ^0.5.0;
 /// @title GEnum - Collection of enums for subscriptions
 /// @author Andrew Redden - <andrew@groundhog.network>
 contract GEnum {
-    enum SubscriptionStatus {
+    enum Status {
         INIT,
         TRIAL,
         VALID,
@@ -18,8 +18,8 @@ contract GEnum {
         HOUR,
         DAY,
         WEEK,
-        MONTH,
         BI_WEEKLY,
+        MONTH,
         THREE_MONTH,
         SIX_MONTH,
         YEAR,

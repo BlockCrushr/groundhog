@@ -1,31 +1,43 @@
 pragma solidity ^0.5.0;
 
-import "../../common/Enum.sol";
+import "../../common/GEnum.sol";
 
 interface SM {
 
-    function isValidSubscription(
-        bytes32 subscriptionHash,
+    function isValid(
+        bytes32 hash,
         bytes calldata signatures
     ) external view returns (bool);
 
-    function execSubscription(
+    function execute(
         address to,
         uint256 value,
         bytes calldata data,
-        uint8 period,
+        GEnum.Period period,
         uint256 startDate,
         uint256 endDate,
-        uint256 uniqId,
-        bytes calldata signatures) external returns (bool);
+        uint256 unique,
+        bytes calldata signatures
+    ) external returns (bool);
 
-    function cancelSubscriptionAsRecipient(
+    function cancelAsRecipient(
         address to,
         uint256 value,
         bytes calldata data,
-        uint8 period,
+        GEnum.Period period,
         uint256 startDate,
         uint256 endDate,
-        uint256 uniqId,
-        bytes calldata signatures) external returns (bool);
+        uint256 unique,
+        bytes calldata signatures
+    ) external returns (bool);
+
+    function getHash(
+        address to,
+        uint256 value,
+        bytes calldata data,
+        GEnum.Period period,
+        uint256 startDate,
+        uint256 endDate,
+        uint256 unique
+    ) external returns (bytes32);
 }

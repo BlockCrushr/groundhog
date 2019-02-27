@@ -40,6 +40,7 @@ contract MerchantModule is Module, SecuredTokenTransfer {
         );
         _;
     }
+
     function setup(address _oracleRegistry)
     public
     {
@@ -64,8 +65,6 @@ contract MerchantModule is Module, SecuredTokenTransfer {
     onlyExecutor
     returns (bool)
     {
-
-
         address payable networkWallet = oracleRegistry.getNetworkWallet();
         address payable merchantWallet = address(manager);
 
@@ -149,13 +148,14 @@ contract MerchantModule is Module, SecuredTokenTransfer {
 
             require(token.balanceOf(address(this)) == 0, "BALANCE NOT ZERO");
 
-        require(
+            require(
                 (networkBalanceStart.add(networkSplit) == token.balanceOf(networkWallet))
                 &&
                 (merchantBalanceStart.add(merchantSplit) == token.balanceOf(merchantWallet)),
                 "MerchantModule::withdraw: INVALID_EXEC TOKEN_SPLIT_PAYOUT"
             );
         }
+
         return true;
     }
 
@@ -165,23 +165,23 @@ contract MerchantModule is Module, SecuredTokenTransfer {
         address to,
         uint256 value,
         bytes memory data,
-        uint8 period,
+        GEnum.Period period,
         uint256 startDate,
         uint256 endDate,
-        uint256 uniqId,
+        uint256 unique,
         bytes memory signatures
     )
     public
     authorized
     {
-        SM(customer).cancelSubscriptionAsRecipient(
+        SM(customer).cancelAsRecipient(
             to,
             value,
             data,
             period,
             startDate,
             endDate,
-            uniqId,
+            unique,
             signatures
         );
     }

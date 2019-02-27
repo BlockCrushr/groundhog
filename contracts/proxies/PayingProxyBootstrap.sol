@@ -33,7 +33,12 @@ contract PayingProxyBootstrap is SecuredTokenTransfer {
         Proxy module = new Proxy(subModuleMasteryCopy);
         emit ProxyCreation(module);
 
-        PayingProxy safe = new PayingProxy(safeMasterCopy, funder, paymentToken, payment);
+        PayingProxy safe = new PayingProxy(
+            safeMasterCopy,
+            funder,
+            paymentToken,
+            payment
+        );
         emit PProxyCreation(safe);
 
         bytes memory createAddData = abi.encodeWithSignature(

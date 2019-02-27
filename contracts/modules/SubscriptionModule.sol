@@ -3,7 +3,6 @@ pragma solidity ^0.5.0;
 import "../base/Module.sol";
 import "../base/OwnerManager.sol";
 import "../common/GEnum.sol";
-import "../common/Enum.sol";
 import "../common/SignatureDecoder.sol";
 import "../external/BokkyPooBahsDateTimeLibrary.sol";
 import "../external/Math.sol";
@@ -29,43 +28,38 @@ contract SubscriptionModule is Module, SignatureDecoder {
     bytes32 public constant DOMAIN_SEPARATOR_TYPEHASH = 0x035aff83d86937d35b32e04f0ddc6ff469290eef2f1b692d8a815c89404d4749;
 
     //keccak256(
-    //  "EIP1337Execute(address to,uint256 value,bytes data,uint8 period,uint256 startDate,uint256 endDate,uint256 uniqId)"
+    //  "EIP1337Execute(address to,uint256 value,bytes data,uint8 period,uint256 startDate,uint256 endDate,uint256 unique)"
     //)
-    bytes32 public constant EIP1337_TYPEHASH = 0xfb712ff729dee2cfef270710d9358c6b90f95803526927d0f046a957b02071ae;
-
-    //    //keccak256(
-    //    //  "EIP1337Execute(address to,uint256 value,bytes data,uint8 period,uint8 rate,uint256 startDate,uint256 endDate,uint256 uniqId)"
-    //    //)
-    //    bytes32 public constant EIP1337_TYPEHASH = 0x42d388c264cfbbed274909b3cf362a96c5cf9b2cd6733165cb9a8bb92b532098;
+    bytes32 public constant EIP1337_TYPEHASH = 0x5b2427a6a143d63fc84d73a2ad07e5058a013b12e476c04a97c43b86bbb2392b;
 
     //keccak256(
-    //  "EIP1337Action(bytes32 subscriptionHash,string action)"
+    //  "EIP1337Action(bytes32 hash,string action)"
     //)
-    bytes32 public constant EIP1337_ACTION_TYPEHASH = 0x98c669e75fc9074217ec4f5c9c90babd89fd441cbf72df46c51dc164302d29a6;
+    bytes32 public constant EIP1337_ACTION_TYPEHASH = 0x1c6d00adc347592e646f0e48a431169e705ca19f86f9a3849e50e8557a510051;
 
     mapping(bytes32 => Meta) public subscriptions;
 
     struct Meta {
-        GEnum.SubscriptionStatus status;
+        GEnum.Status status;
         uint256 nextWithdraw;
         uint256 endDate;
     }
 
     event NextPayment(
-        bytes32 indexed subscriptionHash,
+        bytes32 indexed hash,
         uint256 nextWithdraw
     );
 
     event OraclizedDenomination(
-        bytes32 indexed subscriptionHash,
+        bytes32 indexed hash,
         uint256 dynPriceFormat,
         uint256 conversionRate,
         uint256 paymentTotal
     );
     event StatusChanged(
-        bytes32 indexed subscriptionHash,
-        GEnum.SubscriptionStatus prev,
-        GEnum.SubscriptionStatus next
+        bytes32 indexed hash,
+        GEnum.Status prev,
+        GEnum.Status next
     );
 
     /// @dev Setup function sets manager
@@ -102,19 +96,19 @@ contract SubscriptionModule is Module, SignatureDecoder {
     /// @param value Ether value of Safe transaction.
     /// @param data Data payload of Safe transaction.
     /// @param period uint256
-    /// @param uniqId uint256
+    /// @param unique uint256
     /// @param startDate uint256
     /// @param endDate uint256
-    /// @param signatures Packed signature data ({bytes32 r}{bytes32 s}{uint2568 v})
+    /// @param signatures Packed signature data ({bytes32 r}{bytes32 s}{uint256 v})
     /// @return success boolean value of execution
-    function execSubscription(
+    function execute(
         address to,
         uint256 value,
         bytes memory data,
         uint8 period,
         uint256 startDate,
         uint256 endDate,
-        uint256 uniqId,
+        uint256 unique,
         bytes memory signatures
     )
     public
@@ -124,19 +118,19 @@ contract SubscriptionModule is Module, SignatureDecoder {
     )
     {
 
-        bytes memory subHashData = encodeSubscriptionData(
+        bytes memory subhashData = encodeSubscriptionData(
             to,
             value,
             data,
             period,
             startDate,
             endDate,
-            uniqId
+            unique
         );
 
         require(
-            _checkHash(
-                keccak256(subHashData),
+            _checkhash(
+                keccak256(subhashData),
                 signatures
             ),
             "SubscriptionModule::execSubscription: INVALID_DATA: SIGNATURES"
@@ -146,44 +140,43 @@ contract SubscriptionModule is Module, SignatureDecoder {
             to,
             value,
             data,
-            keccak256(subHashData),
+            keccak256(subhashData),
             period,
             startDate,
             endDate,
-            uniqId
+            unique
         );
     }
-
 
     /// @dev internal method to execution the actual payment
     function _paySubscription(
         address to,
         uint256 value,
         bytes memory data,
-        bytes32 subscriptionHash,
+        bytes32 hash,
         uint8 period,
         uint256 startDate,
         uint256 endDate,
-        uint256 uniqId
+        uint256 unique
     )
     internal
     returns (bool processPayment)
     {
 
 
-        processPayment = _processSub(
-            subscriptionHash,
+        processPayment = _process(
+            hash,
             period,
             startDate,
             endDate,
-            uniqId
+            unique
         );
 
         if (processPayment) {
 
-            uint256 conversionRate;
             if (value != 0 && (data.length == 32)) {//find a better type identifier to show these, first x bytes are something
                 //if its 32 exactly, its likely just the one uint256, which means this is not a function call
+                uint256 conversionRate;
 
                 uint256 oracleFeed = abi.decode(
                     data, (uint)
@@ -195,11 +188,12 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
                 conversionRate = uint256(rate);
 
-                require(conversionRate != uint(0));
+                require(
+                    conversionRate != uint(0),
+                    "SubscriptionModule::_paySubscription: INVALID_FORMAT: CONVERSION_RATE"
+                );
                 data = "0x";
-            }
 
-            if (conversionRate != uint256(0)) {
 
                 //when in priceFeed format, price feeds are denominated in Ether but converted to the feed pairing
                 //ETHUSD, WBTC/USD
@@ -213,7 +207,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
                 );
 
                 emit OraclizedDenomination(
-                    subscriptionHash,
+                    hash,
                     value,
                     conversionRate,
                     payment
@@ -229,10 +223,8 @@ contract SubscriptionModule is Module, SignatureDecoder {
         }
     }
 
-
-
     /// @dev hash check function, to verify that owners have signed the incoming signature
-    function _checkHash(
+    function _checkhash(
         bytes32 hash,
         bytes memory signatures
     )
@@ -259,12 +251,12 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
             require(
                 OwnerManager(address(manager)).isOwner(currentOwner),
-                "SubscriptionModule::_checkHash: INVALID_DATA: SIGNATURE_NOT_OWNER"
+                "SubscriptionModule::_checkhash: INVALID_DATA: SIGNATURE_NOT_OWNER"
             );
 
             require(
                 currentOwner > lastOwner,
-                "SubscriptionModule::_checkHash: INVALID_DATA: SIGNATURE_OUT_ORDER"
+                "SubscriptionModule::_checkhash: INVALID_DATA: SIGNATURE_OUT_ORDER"
             );
 
             lastOwner = currentOwner;
@@ -273,92 +265,91 @@ contract SubscriptionModule is Module, SignatureDecoder {
         valid = true;
     }
 
-
     /// @dev Allows to execute a Safe transaction confirmed by required number of owners and then pays the account that submitted the transaction.
     ///      Note: The fees are always transferred, even if the user transaction fails.
-    /// @param subscriptionHash bytes32 hash of on chain sub
-    /// @return bool isValid returns the validity of the subscription
-    function isValidSubscription(
-        bytes32 subscriptionHash,
+    /// @param hash bytes32 hash of on chain sub
+    /// @return bool valid returns the validity of the subscription
+    function isValid(
+        bytes32 hash,
         bytes memory signatures
     )
     public
     view
-    returns (bool isValid)
+    returns (bool valid)
     {
 
-        Meta storage sub = subscriptions[subscriptionHash];
+        Meta storage sub = subscriptions[hash];
 
         //exit early if we can
-        if (sub.status == GEnum.SubscriptionStatus.INIT) {
-            return _checkHash(
-                subscriptionHash,
+        if (sub.status == GEnum.Status.INIT) {
+            return _checkhash(
+                hash,
                 signatures
             );
         }
 
-        if (sub.status == GEnum.SubscriptionStatus.EXPIRED || sub.status == GEnum.SubscriptionStatus.CANCELLED) {
+        if (sub.status == GEnum.Status.EXPIRED || sub.status == GEnum.Status.CANCELLED) {
 
             require(
                 sub.endDate != 0,
-                "SubscriptionModule::isValidSubscription: INVALID_STATE: SUB_STATUS"
+                "SubscriptionModule::isValid: INVALID_STATE: SUB_STATUS"
             );
 
-            isValid = (now <= sub.endDate);
+            valid = (now <= sub.endDate);
         } else if (
-            (sub.status == GEnum.SubscriptionStatus.TRIAL && sub.nextWithdraw <= now)
+            (sub.status == GEnum.Status.TRIAL && sub.nextWithdraw <= now)
             ||
-            (sub.status == GEnum.SubscriptionStatus.VALID)
+            (sub.status == GEnum.Status.VALID)
         ) {
-            isValid = true;
+            valid = true;
         } else {
-            isValid = false;
+            valid = false;
         }
     }
 
     //cancel subscription as a gnosis safe txn
-    function cancelSubscriptionAsManager(
-        bytes32 subscriptionHash
+    function cancelAsManager(
+        bytes32 hash
     )
     authorized
     public
     returns (bool success) {
 
-        success = _cancelSubscription(subscriptionHash);
+        success = _cancel(hash);
     }
 
     /// @dev cancel the subscription as the recipient of the subscription, in cases where a merchant wants to
     /// cancel and prevent further payment
-    function cancelSubscriptionAsRecipient(
+    function cancelAsRecipient(
         address to,
         uint256 value,
         bytes memory data,
         uint8 period,
         uint256 startDate,
         uint256 endDate,
-        uint256 uniqId,
+        uint256 unique,
         bytes memory signatures
     )
     public
     returns (bool cancelled) {
 
-        bytes memory subHashData = encodeSubscriptionData(
+        bytes memory subhashData = encodeSubscriptionData(
             to,
             value,
             data,
             period,
             startDate,
             endDate,
-            uniqId
+            unique
         );
 
         require(
-            _checkHash(keccak256(subHashData), signatures),
+            _checkhash(keccak256(subhashData), signatures),
             "SubscriptionModule::cancelSubscriptionAsRecipient: INVALID_DATA: SIGNATURES"
         );
 
         address recipient = to;
-//        if no value, assume its an ERC20 token, remove the to argument from the data
+        //        if no value, assume its an ERC20 token, remove the to argument from the data
         if (value == uint(0)) {
 
             // solium-disable-next-line security/no-inline-assembly
@@ -369,7 +360,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
         require(msg.sender == recipient, "SubscriptionModule::isRecipient: MSG_SENDER_NOT_RECIPIENT");
 
-        cancelled = _cancelSubscription(keccak256(subHashData));
+        cancelled = _cancel(keccak256(subhashData));
 
     }
 
@@ -377,51 +368,51 @@ contract SubscriptionModule is Module, SignatureDecoder {
     /// @dev Allows to execute a Safe transaction confirmed by required number of owners and then pays the account that
     /// submitted the transaction.
     /// @return bool hash of on sub to revoke or cancel
-    function cancelSubscription(
-        bytes32 subscriptionHash,
+    function cancel(
+        bytes32 hash,
         bytes memory signatures
     )
     public
     returns (bool cancelled)
     {
 
-        bytes32 cancelHash = getSubscriptionActionHash(subscriptionHash, "cancel");
+        bytes32 cancelhash = getActionhash(hash, "cancel");
 
         require(
-            _checkHash(cancelHash, signatures),
+            _checkhash(cancelhash, signatures),
             "SubscriptionModule::cancelSubscription: INVALID_DATA: SIGNATURES_INVALID"
         );
 
-        cancelled = _cancelSubscription(subscriptionHash);
+        cancelled = _cancel(hash);
 
     }
 
 
     /// @dev the internal function that cancels the subscription
-    function _cancelSubscription(
-        bytes32 subscriptionHash
+    function _cancel(
+        bytes32 hash
     )
     internal
     returns (bool cancelled)
     {
 
-        Meta storage sub = subscriptions[subscriptionHash];
+        Meta storage sub = subscriptions[hash];
 
 
         require(
-            (sub.status != GEnum.SubscriptionStatus.CANCELLED && sub.status != GEnum.SubscriptionStatus.EXPIRED),
-            "SubscriptionModule::_cancelSubscription: INVALID_STATE: SUB_STATUS"
+            (sub.status != GEnum.Status.CANCELLED && sub.status != GEnum.Status.EXPIRED),
+            "SubscriptionModule::_cancel: INVALID_STATE: SUB_STATUS"
         );
 
         emit StatusChanged(
-            subscriptionHash,
+            hash,
             sub.status,
-            GEnum.SubscriptionStatus.CANCELLED
+            GEnum.Status.CANCELLED
         );
 
-        sub.status = GEnum.SubscriptionStatus.CANCELLED;
+        sub.status = GEnum.Status.CANCELLED;
 
-        if (sub.status != GEnum.SubscriptionStatus.INIT) {
+        if (sub.status != GEnum.Status.INIT) {
             sub.endDate = sub.nextWithdraw;
         }
 
@@ -432,32 +423,32 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
     /// @dev used to help mitigate stack issues
     /// @return bool
-    function _processSub(
-        bytes32 subscriptionHash,
+    function _process(
+        bytes32 hash,
         uint8 period,
         uint256 startDate,
         uint256 endDate,
-        uint256 uniqId
+        uint256 unique
     )
     internal
     returns (bool processPayment)
     {
         uint256 withdrawHolder;
-        Meta storage sub = subscriptions[subscriptionHash];
+        Meta storage sub = subscriptions[hash];
 
         require(
-            (sub.status != GEnum.SubscriptionStatus.EXPIRED && sub.status != GEnum.SubscriptionStatus.CANCELLED),
-            "SubscriptionModule::_processSub: INVALID_STATE: SUB_STATUS"
+            (sub.status != GEnum.Status.EXPIRED && sub.status != GEnum.Status.CANCELLED),
+            "SubscriptionModule::_process: INVALID_STATE: SUB_STATUS"
         );
 
 
-        if (sub.status == GEnum.SubscriptionStatus.INIT) {
+        if (sub.status == GEnum.Status.INIT) {
 
             if (endDate != 0) {
 
                 require(
                     endDate >= now,
-                    "SubscriptionModule::_processSub: INVALID_DATA: SUB_END_DATE"
+                    "SubscriptionModule::_process: INVALID_DATA: SUB_END_DATE"
                 );
                 sub.endDate = endDate;
             }
@@ -466,19 +457,19 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
                 require(
                     startDate >= now,
-                    "SubscriptionModule::_processSub: INVALID_DATA: SUB_START_DATE"
+                    "SubscriptionModule::_process: INVALID_DATA: SUB_START_DATE"
                 );
                 sub.nextWithdraw = startDate;
-                sub.status = GEnum.SubscriptionStatus.TRIAL;
+                sub.status = GEnum.Status.TRIAL;
 
                 emit StatusChanged(
-                    subscriptionHash,
-                    GEnum.SubscriptionStatus.INIT,
-                    GEnum.SubscriptionStatus.TRIAL
+                    hash,
+                    GEnum.Status.INIT,
+                    GEnum.Status.TRIAL
                 );
                 //emit here because of early method exit after trial setup
                 emit NextPayment(
-                    subscriptionHash,
+                    hash,
                     sub.nextWithdraw
                 );
 
@@ -488,38 +479,38 @@ contract SubscriptionModule is Module, SignatureDecoder {
             } else {
 
                 sub.nextWithdraw = now;
-                sub.status = GEnum.SubscriptionStatus.VALID;
+                sub.status = GEnum.Status.VALID;
                 emit StatusChanged(
-                    subscriptionHash,
-                    GEnum.SubscriptionStatus.INIT,
-                    GEnum.SubscriptionStatus.VALID
+                    hash,
+                    GEnum.Status.INIT,
+                    GEnum.Status.VALID
                 );
             }
 
-        } else if (sub.status == GEnum.SubscriptionStatus.TRIAL) {
+        } else if (sub.status == GEnum.Status.TRIAL) {
 
             require(
                 now >= startDate,
-                "SubscriptionModule::_processSub: INVALID_STATE: SUB_START_DATE"
+                "SubscriptionModule::_process: INVALID_STATE: SUB_START_DATE"
             );
             sub.nextWithdraw = now;
-            sub.status = GEnum.SubscriptionStatus.VALID;
+            sub.status = GEnum.Status.VALID;
 
             emit StatusChanged(
-                subscriptionHash,
-                GEnum.SubscriptionStatus.TRIAL,
-                GEnum.SubscriptionStatus.VALID
+                hash,
+                GEnum.Status.TRIAL,
+                GEnum.Status.VALID
             );
         }
 
         require(
-            sub.status == GEnum.SubscriptionStatus.VALID,
-            "SubscriptionModule::_processSub: INVALID_STATE: SUB_STATUS"
+            sub.status == GEnum.Status.VALID,
+            "SubscriptionModule::_process: INVALID_STATE: SUB_STATUS"
         );
 
         require(
             now >= sub.nextWithdraw && sub.nextWithdraw != 0,
-            "SubscriptionModule::_processSub: INVALID_STATE: SUB_NEXT_WITHDRAW"
+            "SubscriptionModule::_process: INVALID_STATE: SUB_NEXT_WITHDRAW"
         );
 
         if (
@@ -571,7 +562,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
             withdrawHolder = BokkyPooBahsDateTimeLibrary.addYears(sub.nextWithdraw, 3);
 
         } else {
-            revert("SubscriptionModule::_processSub: INVALID_DATA: PERIOD");
+            revert("SubscriptionModule::_process: INVALID_DATA: PERIOD");
         }
 
         //if a subscription is expiring and its next withdraw timeline is beyond hte time of the expiration
@@ -580,17 +571,17 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
             sub.nextWithdraw = 0;
             emit StatusChanged(
-                subscriptionHash,
+                hash,
                 sub.status,
-                GEnum.SubscriptionStatus.EXPIRED
+                GEnum.Status.EXPIRED
             );
-            sub.status = GEnum.SubscriptionStatus.EXPIRED;
+            sub.status = GEnum.Status.EXPIRED;
         } else {
             sub.nextWithdraw = withdrawHolder;
         }
 
         emit NextPayment(
-            subscriptionHash,
+            hash,
             sub.nextWithdraw
         );
         processPayment = true;
@@ -598,17 +589,15 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
     /// @dev Returns hash to be signed by owners.
     /// @param to Destination address.
-    /// @param value Ether value.
-    /// @param data Data payload.
     /// @return Subscription hash.
-    function getSubscriptionHash(
+    function getHash(
         address to,
         uint256 value,
         bytes memory data,
         uint8 period,
         uint256 startDate,
         uint256 endDate,
-        uint256 uniqId
+        uint256 unique
     )
     public
     view
@@ -622,14 +611,14 @@ contract SubscriptionModule is Module, SignatureDecoder {
                 period,
                 startDate,
                 endDate,
-                uniqId
+                unique
             )
         );
     }
 
     /// @dev Returns hash to be signed by owners for cancelling a subscription
-    function getSubscriptionActionHash(
-        bytes32 subscriptionHash,
+    function getActionhash(
+        bytes32 hash,
         string memory action
     )
     public
@@ -637,10 +626,10 @@ contract SubscriptionModule is Module, SignatureDecoder {
     returns (bytes32)
     {
 
-        bytes32 eip1337ActionHash = keccak256(
+        bytes32 eip1337Actionhash = keccak256(
             abi.encode(
                 EIP1337_ACTION_TYPEHASH,
-                subscriptionHash,
+                hash,
                 keccak256(abi.encodePacked(action))
             )
         );
@@ -650,7 +639,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
                 byte(0x19),
                 byte(0x01),
                 domainSeparator,
-                eip1337ActionHash
+                eip1337Actionhash
             )
         );
     }
@@ -668,13 +657,13 @@ contract SubscriptionModule is Module, SignatureDecoder {
         uint8 period,
         uint256 startDate,
         uint256 endDate,
-        uint256 uniqId
+        uint256 unique
     )
     public
     view
     returns (bytes memory)
     {
-        bytes32 eip1337TxHash = keccak256(
+        bytes32 eip1337Txhash = keccak256(
             abi.encode(
                 EIP1337_TYPEHASH,
                 to,
@@ -683,7 +672,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
                 period,
                 startDate,
                 endDate,
-                uniqId
+                unique
             )
         );
 
@@ -691,7 +680,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
             byte(0x19),
             byte(0x01),
             domainSeparator,
-            eip1337TxHash
+            eip1337Txhash
         );
     }
 }

@@ -4,6 +4,5 @@ interface MMInterface {
     function split(
         address tokenAddress
     )
-    external
-    returns (bool);
+    external returns (bool);
 }
