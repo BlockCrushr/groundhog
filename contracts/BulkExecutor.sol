@@ -22,7 +22,7 @@ contract BulkExecutor is Ownable {
         GEnum.Period[] memory period,
         uint256[] memory startDate,
         uint256[] memory endDate,
-        uint256[] memory uniqId,
+        uint256[] memory unique,
         bytes[] memory sig
     )
     public
@@ -51,7 +51,7 @@ contract BulkExecutor is Ownable {
                     period[i],
                     startDate[i],
                     endDate[i],
-                    uniqId[i],
+                    unique[i],
                     sig[i]
                 )
             ) {

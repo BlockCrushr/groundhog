@@ -118,7 +118,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
     )
     {
 
-        bytes memory subhashData = encodeSubscriptionData(
+        bytes memory subHashData = encodeSubscriptionData(
             to,
             value,
             data,
@@ -129,8 +129,8 @@ contract SubscriptionModule is Module, SignatureDecoder {
         );
 
         require(
-            _checkhash(
-                keccak256(subhashData),
+            _checkHash(
+                keccak256(subHashData),
                 signatures
             ),
             "SubscriptionModule::execSubscription: INVALID_DATA: SIGNATURES"
@@ -140,7 +140,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
             to,
             value,
             data,
-            keccak256(subhashData),
+            keccak256(subHashData),
             period,
             startDate,
             endDate,
@@ -224,7 +224,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
     }
 
     /// @dev hash check function, to verify that owners have signed the incoming signature
-    function _checkhash(
+    function _checkHash(
         bytes32 hash,
         bytes memory signatures
     )
@@ -251,12 +251,12 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
             require(
                 OwnerManager(address(manager)).isOwner(currentOwner),
-                "SubscriptionModule::_checkhash: INVALID_DATA: SIGNATURE_NOT_OWNER"
+                "SubscriptionModule::_checkHash: INVALID_DATA: SIGNATURE_NOT_OWNER"
             );
 
             require(
                 currentOwner > lastOwner,
-                "SubscriptionModule::_checkhash: INVALID_DATA: SIGNATURE_OUT_ORDER"
+                "SubscriptionModule::_checkHash: INVALID_DATA: SIGNATURE_OUT_ORDER"
             );
 
             lastOwner = currentOwner;
@@ -282,7 +282,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
         //exit early if we can
         if (sub.status == GEnum.Status.INIT) {
-            return _checkhash(
+            return _checkHash(
                 hash,
                 signatures
             );
@@ -333,7 +333,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
     public
     returns (bool cancelled) {
 
-        bytes memory subhashData = encodeSubscriptionData(
+        bytes memory subHashData = encodeSubscriptionData(
             to,
             value,
             data,
@@ -344,7 +344,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
         );
 
         require(
-            _checkhash(keccak256(subhashData), signatures),
+            _checkHash(keccak256(subHashData), signatures),
             "SubscriptionModule::cancelSubscriptionAsRecipient: INVALID_DATA: SIGNATURES"
         );
 
@@ -360,7 +360,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
         require(msg.sender == recipient, "SubscriptionModule::isRecipient: MSG_SENDER_NOT_RECIPIENT");
 
-        cancelled = _cancel(keccak256(subhashData));
+        cancelled = _cancel(keccak256(subHashData));
 
     }
 
@@ -376,10 +376,10 @@ contract SubscriptionModule is Module, SignatureDecoder {
     returns (bool cancelled)
     {
 
-        bytes32 cancelhash = getActionhash(hash, "cancel");
+        bytes32 cancelhash = getActionHash(hash, "cancel");
 
         require(
-            _checkhash(cancelhash, signatures),
+            _checkHash(cancelhash, signatures),
             "SubscriptionModule::cancelSubscription: INVALID_DATA: SIGNATURES_INVALID"
         );
 
@@ -617,7 +617,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
     }
 
     /// @dev Returns hash to be signed by owners for cancelling a subscription
-    function getActionhash(
+    function getActionHash(
         bytes32 hash,
         string memory action
     )
@@ -626,7 +626,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
     returns (bytes32)
     {
 
-        bytes32 eip1337Actionhash = keccak256(
+        bytes32 eip1337ActionHash = keccak256(
             abi.encode(
                 EIP1337_ACTION_TYPEHASH,
                 hash,
@@ -639,7 +639,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
                 byte(0x19),
                 byte(0x01),
                 domainSeparator,
-                eip1337Actionhash
+                eip1337ActionHash
             )
         );
     }
@@ -663,7 +663,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
     view
     returns (bytes memory)
     {
-        bytes32 eip1337Txhash = keccak256(
+        bytes32 eip1337TxHash = keccak256(
             abi.encode(
                 EIP1337_TYPEHASH,
                 to,
@@ -680,7 +680,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
             byte(0x19),
             byte(0x01),
             domainSeparator,
-            eip1337Txhash
+            eip1337TxHash
         );
     }
 }
