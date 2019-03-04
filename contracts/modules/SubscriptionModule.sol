@@ -246,7 +246,8 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
             currentOwner = recoverKey(
                 hash,
-                signatures, i
+                signatures,
+                i
             );
 
             require(
@@ -453,13 +454,10 @@ contract SubscriptionModule is Module, SignatureDecoder {
                 sub.endDate = endDate;
             }
 
-            if (startDate != 0) {
+            if (startDate != 0 && startDate >= now) {
 
-                require(
-                    startDate >= now,
-                    "SubscriptionModule::_process: INVALID_DATA: SUB_START_DATE"
-                );
                 sub.nextWithdraw = startDate;
+
                 sub.status = GEnum.Status.TRIAL;
 
                 emit StatusChanged(
@@ -476,6 +474,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
                 //early exit to let trial period start
                 processPayment = false;
                 return processPayment;
+
             } else {
 
                 sub.nextWithdraw = now;
@@ -493,7 +492,9 @@ contract SubscriptionModule is Module, SignatureDecoder {
                 now >= startDate,
                 "SubscriptionModule::_process: INVALID_STATE: SUB_START_DATE"
             );
-            sub.nextWithdraw = now;
+            //prevents drift from a txn being included late by setting it to the startDate
+            //only way into trial is from INIT with a startDate greater than the time of inclusion, otherwise its valid
+            sub.nextWithdraw = startDate;
             sub.status = GEnum.Status.VALID;
 
             emit StatusChanged(
@@ -514,59 +515,66 @@ contract SubscriptionModule is Module, SignatureDecoder {
         );
 
         if (
-            period == uint256(GEnum.Period.MINUTE)
+            period == uint8(GEnum.Period.DAY)
         ) {
-            withdrawHolder = BokkyPooBahsDateTimeLibrary.addMinutes(sub.nextWithdraw, 1);
+            withdrawHolder = BokkyPooBahsDateTimeLibrary.addDays(
+                sub.nextWithdraw, 1
+            );
         } else if (
-            period == uint256(GEnum.Period.HOUR)
+            period == uint8(GEnum.Period.WEEK)
         ) {
-            withdrawHolder = BokkyPooBahsDateTimeLibrary.addHours(sub.nextWithdraw, 1);
+            withdrawHolder = BokkyPooBahsDateTimeLibrary.addDays(
+                sub.nextWithdraw, 7
+            );
         } else if (
-            period == uint256(GEnum.Period.DAY)
+            period == uint8(GEnum.Period.BI_WEEKLY)
         ) {
-            withdrawHolder = BokkyPooBahsDateTimeLibrary.addDays(sub.nextWithdraw, 1);
+            withdrawHolder = BokkyPooBahsDateTimeLibrary.addDays(
+                sub.nextWithdraw, 14
+            );
         } else if (
-            period == uint256(GEnum.Period.WEEK)
+            period == uint8(GEnum.Period.MONTH)
         ) {
-            withdrawHolder = BokkyPooBahsDateTimeLibrary.addDays(sub.nextWithdraw, 7);
+            withdrawHolder = BokkyPooBahsDateTimeLibrary.addMonths(
+                sub.nextWithdraw, 1
+            );
         } else if (
-            period == uint256(GEnum.Period.BI_WEEKLY)
+            period == uint8(GEnum.Period.THREE_MONTH)
         ) {
-            withdrawHolder = BokkyPooBahsDateTimeLibrary.addDays(sub.nextWithdraw, 14);
+            withdrawHolder = BokkyPooBahsDateTimeLibrary.addMonths(
+                sub.nextWithdraw, 3
+            );
         } else if (
-            period == uint256(GEnum.Period.MONTH)
+            period == uint8(GEnum.Period.SIX_MONTH)
         ) {
-            withdrawHolder = BokkyPooBahsDateTimeLibrary.addMonths(sub.nextWithdraw, 1);
+            withdrawHolder = BokkyPooBahsDateTimeLibrary.addMonths(
+                sub.nextWithdraw, 6
+            );
         } else if (
-            period == uint256(GEnum.Period.THREE_MONTH)
+            period == uint8(GEnum.Period.YEAR)
         ) {
-            withdrawHolder = BokkyPooBahsDateTimeLibrary.addMonths(sub.nextWithdraw, 3);
-
+            withdrawHolder = BokkyPooBahsDateTimeLibrary.addYears(
+                sub.nextWithdraw, 1
+            );
         } else if (
-            period == uint256(GEnum.Period.SIX_MONTH)
+            period == uint8(GEnum.Period.TWO_YEAR)
         ) {
-            withdrawHolder = BokkyPooBahsDateTimeLibrary.addMonths(sub.nextWithdraw, 6);
-
+            withdrawHolder = BokkyPooBahsDateTimeLibrary.addYears(
+                sub.nextWithdraw, 2
+            );
         } else if (
-            period == uint256(GEnum.Period.YEAR)
+            period == uint8(GEnum.Period.THREE_YEAR)
         ) {
-            withdrawHolder = BokkyPooBahsDateTimeLibrary.addYears(sub.nextWithdraw, 1);
-        } else if (
-            period == uint256(GEnum.Period.TWO_YEAR)
-        ) {
-            withdrawHolder = BokkyPooBahsDateTimeLibrary.addYears(sub.nextWithdraw, 2);
-
-        } else if (
-            period == uint256(GEnum.Period.THREE_YEAR)
-        ) {
-            withdrawHolder = BokkyPooBahsDateTimeLibrary.addYears(sub.nextWithdraw, 3);
-
+            withdrawHolder = BokkyPooBahsDateTimeLibrary.addYears(
+                sub.nextWithdraw, 3
+            );
         } else {
-            revert("SubscriptionModule::_process: INVALID_DATA: PERIOD");
+            revert(
+                "SubscriptionModule::_process: INVALID_DATA: PERIOD"
+            );
         }
 
-        //if a subscription is expiring and its next withdraw timeline is beyond hte time of the expiration
-        //modify the status
+        //if a subscription is expiring and its next withdraw timeline is beyond the time of the expiration
         if (sub.endDate != 0 && withdrawHolder >= sub.endDate) {
 
             sub.nextWithdraw = 0;
