@@ -5,7 +5,7 @@ interface OracleRegistryI {
 
     function read(
         uint256 currencyPair
-    ) external view returns (bytes32);
+    ) external view returns (bytes32, address payable);
 
     function getNetworkExecutor()
     external

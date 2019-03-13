@@ -14,6 +14,12 @@ contract BulkExecutor is Ownable {
         address indexed asset
     );
 
+    event NoPayment(
+        address indexed subscriptionModule,
+        address indexed merchantModule,
+        address indexed asset
+    );
+
     function bulkExecute(
         address[] memory customers,
         address payable[] memory to,
@@ -92,6 +98,8 @@ contract BulkExecutor is Ownable {
 
                 if (MMInterface(merchant).split(asset)) {
                     emit SuccessSplit(customers[i], merchant, asset);
+                } else {
+                    emit NoPayment(customers[i], merchant, asset);
                 }
             }
         }

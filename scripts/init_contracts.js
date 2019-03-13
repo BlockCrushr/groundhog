@@ -2,6 +2,7 @@ const fs = require('fs');
 
 const OracleRegistry = artifacts.require("./OracleRegistry.sol");
 const SubscriptionModule = artifacts.require("./SubscriptionModule.sol");
+const MerchantModule = artifacts.require("./MerchantModule.sol");
 
 const notOwnedAddress = "0x0000000000000000000000000000000000000002"
 const notOwnedAddress2 = "0x0000000000000000000000000000000000000003"
@@ -12,7 +13,7 @@ const ignoreErrors = function (promise) {
     })
 }
 
-module.exports = async (callback) => {
+module.exports = (callback) => {
     var network = 'main'
     var processNext = false
     process.argv.forEach(function (arg) {
@@ -27,25 +28,46 @@ module.exports = async (callback) => {
         }
     });
 
-    const ORADDR = '0xBEC8664BDFE35cA6E6AdE337f221c6f07a9b820B';
-    const ETHUSDFEED = '0x729D19f657BD0614b4985Cf1D82531c67569197B';
-    const OR = await OracleRegistry.at(ORADDR);
+    const ORADDR = '0xF253300Bd9Ed0C6aE046edD614196FD8950Ef31f';
+
+    const SMADDR = '0x12a1f243Fb1348510C6Ce7842B5d3c0C43138Ef1';
+
+    const MMADDR = '0xd18D5c0c18B4305fdfC3bECdA6a871E719264609';
+
+    const ETHUSDFEED = '0xa5aA4e07F5255E14F02B385b1f04b35cC50bdb66';
+
+    const EXECUTOR = '0x299C280963E0fd9BE70b1061Dd49D92c1117E02E';
+
+    const NETWORKWALLET = '0x72fE0d6A3E4CB16918A1c658f0856f3D9c64e3d4';
+
     Promise.all([
-        ignoreErrors(OR.setup(
-            [ETHUSDFEED],
-            [web3.utils.fromAscii('ethusd')],
-            ['0xc58B09E9C055e976Dd38315F6aaBB34E4335A3eC', '0xcff6bc631100ca645f40fe312b0d91a5cbf0c138'] //networkwallet/executor
-        )),
-    ])
-        .then(function (values) {
-            values.forEach(function (resp) {
-                if (resp) {
-                    console.log("Success:", resp.tx);
-                }
+            // OracleRegistry.at(ORADDR).then(instance => {
+            //     return instance.setup(
+            //         [ETHUSDFEED],
+            //         [web3.utils.fromAscii('ethusd')],
+            //         ["0x0000000000000000000000000000000000000000"],
+            //         [NETWORKWALLET, EXECUTOR]
+            //     )
+            // }),
+            // SubscriptionModule.at(SMADDR).then(instance => {
+            //     return instance.setup(
+            //         notOwnedAddress
+            //     )
+            // }),
+            MerchantModule.at(MMADDR).then(instance => {
+                return instance.setup(
+                    notOwnedAddress
+                )
             })
-            callback("done")
+        ]
+    ).then(function (values) {
+        values.forEach(function (resp) {
+            if (resp) {
+                console.log("Success:", resp.tx);
+            }
         })
-        .catch((err) => {
-            callback(err)
-        });
-}
+        callback("done")
+    }).catch((err) => {
+        callback(err)
+    });
+};

@@ -3,6 +3,7 @@ const BigNumber = require('bignumber.js')
 const timeHelper = require('./time')
 const PayingProxy = artifacts.require("./PayingProxy.sol")
 
+const web3m = require('web3');
 
 const {
     getContractInstance,
@@ -37,7 +38,8 @@ contract('SubscriptionModule', async (accounts) => {
     let signTypedData = async (account, data) => {
         return new Promise(function (resolve, reject) {
             try {
-                web3.currentProvider.send({
+                let web3sign = new web3m(new web3m.providers.HttpProvider('http://localhost:8545'))
+                web3sign.currentProvider.sendAsync({
                     method: "eth_signTypedData",
                     params: [account, data],
                     from: account
@@ -100,7 +102,9 @@ contract('SubscriptionModule', async (accounts) => {
         let signatureBytes = "0x";
         confirmingAccounts.sort();
         for (let i = 0; i < confirmingAccounts.length; i++) {
-            signatureBytes += (await signTypedData(confirmingAccounts[i], typedData)).replace('0x', '')
+            signatureBytes += (await signTypedData(
+                    confirmingAccounts[i], typedData)
+            ).replace('0x', '')
         }
         return signatureBytes
     }
@@ -114,7 +118,6 @@ contract('SubscriptionModule', async (accounts) => {
                 EIP712Domain: [
                     {type: "address", name: "verifyingContract"}
                 ],
-                //"SafeSubCancelTx(bytes32 hash, string action)"
                 EIP1337Action: [
                     {type: "bytes32", name: "hash"},
                     {type: "string", name: "action"},
@@ -133,7 +136,9 @@ contract('SubscriptionModule', async (accounts) => {
         let signatureBytes = "0x";
         confirmingAccounts.sort();
         for (let i = 0; i < confirmingAccounts.length; i++) {
-            signatureBytes += (await signTypedData(confirmingAccounts[i], typedData)).replace('0x', '')
+            signatureBytes += (await signTypedData(
+                    confirmingAccounts[i], typedData)
+            ).replace('0x', '')
         }
         return signatureBytes
     }
@@ -157,7 +162,6 @@ contract('SubscriptionModule', async (accounts) => {
                 EIP712Domain: [
                     {type: "address", name: "verifyingContract"}
                 ],
-                // "SafeTx(address to,uint256 value,bytes data,uint8 operation,uint256 safeTxGas,uint256 dataGas,uint256 gasPrice,address gasToken,address refundReceiver,uint256 nonce)"
                 SafeTx: [
                     {type: "address", name: "to"},
                     {type: "uint256", name: "value"},
@@ -192,7 +196,9 @@ contract('SubscriptionModule', async (accounts) => {
         let signatureBytes = "0x"
         confirmingAccounts.sort();
         for (let i = 0; i < confirmingAccounts.length; i++) {
-            signatureBytes += (await signTypedData(confirmingAccounts[i], typedData)).replace('0x', '')
+            signatureBytes += (await signTypedData(
+                    confirmingAccounts[i], typedData)
+            ).replace('0x', '')
         }
         return signatureBytes
     }
@@ -284,26 +290,56 @@ contract('SubscriptionModule', async (accounts) => {
     beforeEach(async () => {
 
 
-        bulkExecutor = await getInstance("BulkExecutor", {create: true});
+        // bulkExecutor = await getInstance("BulkExecutor", {
+        //     deployedAddress: "0x299C280963E0fd9BE70b1061Dd49D92c1117E02E"
+        // });
 
 
-        masterCopy = await getInstance("MasterCopy", {create: true});
-
-        multiSend = await getInstance("MultiSend", {create: true});
-
-        let createAndAddModules = await getInstance("CreateAndAddModules", {create: true});
-
-
-        let ethusdOracle = await getInstance("DSFeed", {create: true});
-
-        let proxyFactory = await getInstance("ProxyFactory", {
-            create: true, constructorArgs: PayingProxy.bytecode
+        bulkExecutor = await getInstance("BulkExecutor", {
+            create: true
         });
 
-        let mdw = await getInstance("ModuleDataWrapper", {create: true});
+        masterCopy = await getInstance("MasterCopy", {
+            create: true
+        });
+
+        multiSend = await getInstance("MultiSend", {
+            create: true
+        });
+
+        // let createAndAddModules = await getInstance("CreateAndAddModules", {
+        //     deployedAddress: "0x0b36159cb7d7d33B00e6f118093ba21a74d313DC"
+        // });
+        //
+        let createAndAddModules = await getInstance("CreateAndAddModules", {
+            create: true
+        });
+
+
+        let ethusdOracle = await getInstance("DSFeed", {
+            create: true
+        });
+
+        // let proxyFactory = await getInstance("ProxyFactory", {
+        //     deployedAddress: "0x88cd603a5dc47857d02865bbc7941b588c533263"
+        // });
+
+        let proxyFactory = await getInstance("ProxyFactory", {
+            create: true
+        });
+
+        let mdw = await getInstance("ModuleDataWrapper", {
+            create: true
+        });
         //setup master copies
 
-        let gnosisSafeMasterCopy = await getInstance("GnosisSafe", {create: true});
+        // let gnosisSafeMasterCopy = await getInstance("GnosisSafe", {
+        //     deployedAddress: "0x8942595a2dc5181df0465af0d7be08c8f23c93af"
+        // });
+
+        let gnosisSafeMasterCopy = await getInstance("GnosisSafe", {
+            create: true
+        });
 
         let masterCopySetupTx = await gnosisSafeMasterCopy.methods.setup(
             [accounts[0], accounts[1], accounts[2]], 2,
@@ -312,9 +348,14 @@ contract('SubscriptionModule', async (accounts) => {
             from: accounts[0],
             gasLimit: 8000000
         });
+        // let subscriptionModuleMasterCopy = await getInstance("SubscriptionModule", {deployedAddress: "0x12a1f243Fb1348510C6Ce7842B5d3c0C43138Ef1"});
+        let subscriptionModuleMasterCopy = await getInstance("SubscriptionModule", {
+            create: true
+        });
 
-        let subscriptionModuleMasterCopy = await getInstance("SubscriptionModule", {create: true});
-        mc2 = await getInstance("SubscriptionModule", {create: true});
+        mc2 = await getInstance("SubscriptionModule", {
+            create: true
+        });
 
         tx = await subscriptionModuleMasterCopy.methods.setup(
             "0x0000000000000000000000000000000000000002"
@@ -331,19 +372,29 @@ contract('SubscriptionModule', async (accounts) => {
         })
 
 
-        let oracleRegistry = await getInstance("OracleRegistry", {create: true});
+        // let oracleRegistry = await getInstance("OracleRegistry", {deployedAddress: "0xF253300Bd9Ed0C6aE046edD614196FD8950Ef31f"});
+        let oracleRegistry = await getInstance("OracleRegistry", {
+            create: true
+        });
 
 
         tx = await oracleRegistry.methods.setup(
             [ethusdOracle.options.address],
             [web3.utils.fromAscii('ethusd')],
-            [networkWallet, bulkExecutor.options.address]
+            ["0x0000000000000000000000000000000000000000"],
+            [
+                networkWallet,
+                bulkExecutor.options.address
+            ]
         ).send({
             from: accounts[0],
             gasLimit: 8000000
         });
 
-        let merchantModuleMasterCopy = await getInstance("MerchantModule", {create: true});
+        // let merchantModuleMasterCopy = await getInstance("MerchantModule", {deployedAddress: "0xd18D5c0c18B4305fdfC3bECdA6a871E719264609"});
+        let merchantModuleMasterCopy = await getInstance("MerchantModule", {
+            create: true
+        });
 
         tx = await merchantModuleMasterCopy.methods.setup(
             oracleRegistry.options.address
@@ -391,16 +442,15 @@ contract('SubscriptionModule', async (accounts) => {
         ).encodeABI();
 
         // Create Gnosis Safe
-        // let gnosisSafeData = await gnosisSafeMasterCopy.methods.setup([oracles[0], oracles[1], oracles[2]], 1, oracles[2], '0x').encodeABI();
         let gnosisSafeData = await gnosisSafeMasterCopy.methods.setup(
-            [accounts[0], accounts[1], accounts[2]],
+            [accounts[0]],
             1,
             createAndAddModules.options.address,
             createAndAddModulesData
         ).encodeABI();
 
         let merchantSafeData = await gnosisSafeMasterCopy.methods.setup(
-            [accounts[0], accounts[1], accounts[2]],
+            [accounts[0]],
             1,
             createAndAddModules.options.address,
             merchantCreateAndAddModulesData
@@ -418,7 +468,7 @@ contract('SubscriptionModule', async (accounts) => {
         //     to: create2Address,
         //     value: web3.utils.toWei('0.005', 'ether')
         // });
-
+        //
         gnosisSafe = await utils.getParamFromTxEvent(
             await proxyFactory.methods.createProxy(
                 gnosisSafeMasterCopy.options.address,
@@ -446,14 +496,19 @@ contract('SubscriptionModule', async (accounts) => {
         );
 
 
+        // gnosisSafe = await getInstance("GnosisSafe", {deployedAddress: "0x320E653243e399EB1fb3e20071ABDb667236668d"});
+        // merchantSafe = await getInstance("GnosisSafe", {deployedAddress: "0xc0F1D37B7Ea33F426c91df167182F1da57a61972"});
+
         // gnosisSafe = await getInstance("GnosisSafe", {deployedAddress: '0x716F028c353e2790Fed210E68eB90e2572fC69DA'})
 
+        console.log(`GnosisSafe @ ${gnosisSafe.options.address}`);
         let modules = await gnosisSafe.methods.getModules().call()
         subscriptionModule = await getInstance('SubscriptionModule', {deployedAddress: modules[0]})
         assert.equal(await subscriptionModule.methods.manager().call(), gnosisSafe.options.address)
-
+        console.log(`SubscriptioNModule @ ${modules[0]}`);
         let merchantModules = await merchantSafe.methods.getModules().call()
         merchantModule = await getInstance('merchantModule', {deployedAddress: merchantModules[0]})
+        console.log(`MerchantModule @ ${merchantModules[0]}`);
         assert.equal(await merchantModule.methods.manager().call(), merchantSafe.options.address)
 
     })
@@ -628,13 +683,13 @@ contract('SubscriptionModule', async (accounts) => {
 
 
     it('generate x2 subscriptions(HOG Token, $50 ETHUSD), bulk execute/payment split', async () => {
-        // assert.equal(await web3.eth.getBalance(gnosisSafe.options.address), 0)
+        assert.equal(await web3.eth.getBalance(gnosisSafe.options.address), 0)
         await web3.eth.sendTransaction({
-            from: receiver,
+            from: accounts[0],
             to: gnosisSafe.options.address,
             value: web3.utils.toWei('1.1', 'ether')
         })
-        // assert.equal(await web3.eth.getBalance(gnosisSafe.options.address), web3.utils.toWei('1.1', 'ether'))
+        assert.equal(await web3.eth.getBalance(gnosisSafe.options.address), web3.utils.toWei('1.1', 'ether'))
 
 
         let hogToken = await getInstance("TestToken", {create: true, constructorArgs: [gnosisSafe.options.address]});
@@ -670,8 +725,8 @@ contract('SubscriptionModule', async (accounts) => {
             txdata,
             {
                 meta: {
-                    period: 4, //period day
-                    unique: 1, //
+                    period: 4,
+                    unique: 5,
                     startDate: 0,
                     endDate: 0
                 },
@@ -694,14 +749,14 @@ contract('SubscriptionModule', async (accounts) => {
             'executeSubscription withdraw $50 ETHUSD',
             confirmingAccounts,
             merchantModule.options.address,
-            web3.utils.toWei('50', 'ether'),
+            web3.utils.toWei('1.01', 'ether'),
             oracle,
             {
                 meta: {
                     period: 4,
-                    unique: 2,
+                    unique: 6,
                     startDate: 0,
-                    endDate: 0 //slot 5
+                    endDate: 0
                 },
                 noExec: true
             }
@@ -720,7 +775,7 @@ contract('SubscriptionModule', async (accounts) => {
 
 
         //move blocktime forward just over a day by a few hours
-        await timeHelper.advanceTimeAndBlock(96400);
+        // await timeHelper.advanceTimeAndBlock(96400);
 
 
         // let singleExec = await bulkExecutor.methods.execute(
@@ -747,8 +802,9 @@ contract('SubscriptionModule', async (accounts) => {
             endDate,
             unique,
             sig
-        ).send({from: accounts[0], gasLimit: 8000000})
+        ).send({from: accounts[0], gasLimit: 5000000})
 
+        console.log(bulk)
 
         // let aftermerchantBalanceETH = await web3.eth.getBalance(merchantSafe.options.address);
         // let aftermerchantBalanceHOG = await hogToken.methods.balanceOf(merchantSafe.options.address).call();
@@ -767,7 +823,7 @@ contract('SubscriptionModule', async (accounts) => {
         assert.equal(await web3.eth.getBalance(gnosisSafe.options.address), web3.utils.toWei('1.1', 'ether'))
 
 
-        let confirmingAccounts = [accounts[0], accounts[2]];
+        let confirmingAccounts = [accounts[0]];
         let subSig = await subSigner(
             confirmingAccounts,
             receiver,
@@ -832,7 +888,7 @@ contract('SubscriptionModule', async (accounts) => {
             }]
         });
 
-        let confirmingAccounts = [accounts[0], accounts[2]]
+        let confirmingAccounts = [accounts[0]]
 
         // Withdraw 0.5 ETH
 
@@ -1033,7 +1089,7 @@ contract('SubscriptionModule', async (accounts) => {
 
         let executorBalance = await web3.eth.getBalance(executor)
         let recieverBalance = await web3.eth.getBalance(receiver)
-        let confirmingAccounts = [accounts[0], accounts[2]]
+        let confirmingAccounts = [accounts[0]]
 
 
         // Withdraw 0.5 ETH
@@ -1116,7 +1172,7 @@ contract('SubscriptionModule', async (accounts) => {
 
         let executorBalance = await web3.eth.getBalance(executor)
         let receiverBalance = await web3.eth.getBalance(receiver)
-        let confirmingAccounts = [accounts[0], accounts[2]]
+        let confirmingAccounts = [accounts[0]]
 
 
         // Withdraw 50 USD in ETH
@@ -1198,7 +1254,7 @@ contract('SubscriptionModule', async (accounts) => {
 
         let executorBalance = await web3.eth.getBalance(executor);
         let receiverBalance = await web3.eth.getBalance(receiver);
-        let confirmingAccounts = [accounts[0], accounts[2]];
+        let confirmingAccounts = [accounts[0]];
 
 
         // Withdraw 50 USD in ETH
@@ -1289,7 +1345,7 @@ contract('SubscriptionModule', async (accounts) => {
 
         let executorBalance = await web3.eth.getBalance(executor)
         let receiverBalance = await web3.eth.getBalance(receiver)
-        let confirmingAccounts = [accounts[0], accounts[2]]
+        let confirmingAccounts = [accounts[0]]
 
 
         // Withdraw 50 USD in ETH

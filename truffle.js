@@ -24,15 +24,16 @@ module.exports = {
         return new HDWalletProvider(mnemonic, 'https://kovan.infura.io/v3/' + token)
       },
       network_id: '42',
-      gasPrice: 25000000000, // 25 Gwei
+      gas: 4200000,
+      gasPrice: 15000000000, // 25 Gwei
     },
     mainnet: {
       provider: () => {
-        return new HDWalletProvider(mnemonic, 'https://mainnet.infura.io/' + token)
+        return new HDWalletProvider(mnemonic, 'https://mainnet.infura.io/v3/' + token)
       },
       network_id: '1',
       gas: 4200000,
-      gasPrice: 31000000000, // 25 Gwei
+      gasPrice: 5000000000, // 25 Gwei
     }
   },
   compilers: {

@@ -15,7 +15,8 @@
     "test": "run-with-testrpc -l 20000000 --noVMErrorsOnRPCResponse true 'truffle test'",
     "deploy-rinkeby": "node $NODE_DEBUG_OPTION ./node_modules/.bin/truffle migrate --reset --network kovan",
     "console-rinkeby": "node $NODE_DEBUG_OPTION ./node_modules/.bin/truffle console --network rinkeby",
-    "init-contracts": "node $NODE_DEBUG_OPTION ./node_modules/.bin/truffle exec scripts/init_contracts.js --network mainnet"
+    "init-contracts": "node $NODE_DEBUG_OPTION ./node_modules/.bin/truffle exec scripts/init_contracts.js --network mainnet",
+    "bulk-watcher": "nodemon --exec babel-node bulk_watcher.js"
   },
   "repository": {
     "type": "git",
@@ -38,11 +39,17 @@
     "ethereumjs-abi": "^0.6.5",
     "random-buffer": "*",
     "run-with-testrpc": "^0.3.0",
-    "solidity-coverage": "^0.4.2",
-    "web3": "0.20.6"
+    "solidity-coverage": "^0.5.11"
   },
   "dependencies": {
+    "@babel/cli": "^7.2.3",
+    "@babel/core": "^7.3.4",
+    "babel-cli": "^6.26.0",
     "bitcore-mnemonic": "^1.5.0",
+    "express": "^4.16.4",
+    "ganache-cli": "7.0.0-beta.0",
+    "global": "^4.3.2",
+    "nodemon": "^1.18.10",
     "openzeppelin-solidity": "^2.1.2",
     "solc": "^0.5.0",
     "truffle": "^5.0.1",

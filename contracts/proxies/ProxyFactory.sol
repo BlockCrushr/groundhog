@@ -12,11 +12,11 @@ contract ProxyFactory {
     event PayingProxyCreation(PayingProxy proxy);
 
 
-    constructor(bytes memory code)
-    public
-    {
-        proxyByteCode = code;
-    }
+//    constructor(bytes memory code)
+//    public
+//    {
+//        proxyByteCode = code;
+//    }
 
     /// @dev Allows to create new proxy contact and execute a message call to the new proxy within one transaction.
     /// @param masterCopy Address of master copy.

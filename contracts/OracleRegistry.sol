@@ -21,6 +21,8 @@ contract OracleRegistry is OracleRegistryI, Ownable {
 
     mapping(address => bool) public isWhitelisted;
     mapping(uint256 => address) public oracles;
+    mapping(uint256 => address payable) public oracleToToken;
+
     mapping(address => mapping(address => uint256)) public splitterToFee;
 
 
@@ -32,6 +34,7 @@ contract OracleRegistry is OracleRegistryI, Ownable {
     function setup(
         address[] memory _oracles,
         uint256[] memory _currencyPair,
+        address payable[] memory _currencyPairAsset,
         address payable[] memory _networkSettings
     )
     public
@@ -39,8 +42,14 @@ contract OracleRegistry is OracleRegistryI, Ownable {
     {
         require(_oracles.length == _currencyPair.length);
 
+        require(_oracles.length == _currencyPairAsset.length);
+
         for (uint256 i = 0; i < _oracles.length; i++) {
-            addToWhitelist(_oracles[i], _currencyPair[i]);
+            addToWhitelist(
+                _oracles[i],
+                _currencyPair[i],
+                _currencyPairAsset[i]
+            );
         }
 
         require(_networkSettings.length == 2, "OracleResigstry::setup INVALID_DATA: NETWORK_SETTINGS_LENGTH");
@@ -79,15 +88,29 @@ contract OracleRegistry is OracleRegistryI, Ownable {
 
     function read(
         uint256 currencyPair
-    ) public view returns (bytes32) {
+    ) public view returns (bytes32, address payable) {
+
         address orl = oracles[currencyPair];
-        require(isWhitelisted[orl], "INVALID_DATA: CURRENCY_PAIR");
-        return DSFeedI(orl).read();
+        address payable asset = oracleToToken[currencyPair];
+
+        require(
+            isWhitelisted[orl],
+            "INVALID_DATA: CURRENCY_PAIR"
+        );
+
+        return (
+        DSFeedI(orl).read(),
+        asset
+        );
     }
 
     /// @dev Allows to add destination to whitelist. This can only be done via a Safe transaction.
     /// @param oracle Destination address.
-    function addToWhitelist(address oracle, uint256 currencyPair)
+    function addToWhitelist(
+        address oracle,
+        uint256 currencyPair,
+        address payable currencyPairAsset
+    )
     public
     onlyOwner
     {
@@ -95,6 +118,7 @@ contract OracleRegistry is OracleRegistryI, Ownable {
         require(oracle != address(0), "OracleResigstry::addToWhitelist INVALID_DATA: ORACLE_ADDRESS");
         require(currencyPair != uint256(0), "OracleResigstry::addToWhitelist INVALID_DATA: ORACLE_CURRENCY_PAIR");
         oracles[currencyPair] = oracle;
+        oracleToToken[currencyPair] = currencyPairAsset;
         isWhitelisted[oracle] = true;
         emit OracleActivated(oracle, currencyPair);
     }
@@ -107,6 +131,20 @@ contract OracleRegistry is OracleRegistryI, Ownable {
     {
         require(isWhitelisted[oracle], "Address is not whitelisted");
         isWhitelisted[oracle] = false;
+    }
+
+
+    function setNetworkExecutor(
+        address newNetworkExecutor
+    )
+    public
+    onlyOwner
+    {
+        require(
+            _networkExecutor != newNetworkExecutor,
+            "INVALID_DATA: NEW_ADDRESS_MATCHES"
+        );
+        _networkExecutor = newNetworkExecutor;
     }
 
     function getNetworkExecutor()

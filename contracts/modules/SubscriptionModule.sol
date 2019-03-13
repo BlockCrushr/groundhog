@@ -16,7 +16,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
     using BokkyPooBahsDateTimeLibrary for uint256;
     using DSMath for uint256;
 
-    string public constant NAME = "Groundhog";
+    string public constant NAME = "SubscriptionModule";
     string public constant VERSION = "0.1.0";
 
     bytes32 public domainSeparator;
@@ -43,6 +43,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
         GEnum.Status status;
         uint256 nextWithdraw;
         uint256 endDate;
+        uint256 startDate;
     }
 
     event NextPayment(
@@ -52,14 +53,14 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
     event OraclizedDenomination(
         bytes32 indexed hash,
-        uint256 dynPriceFormat,
+        uint256 indexed dynPriceFormat,
         uint256 conversionRate,
         uint256 paymentTotal
     );
     event StatusChanged(
         bytes32 indexed hash,
-        GEnum.Status prev,
-        GEnum.Status next
+        GEnum.Status indexed prev,
+        GEnum.Status indexed next
     );
 
     /// @dev Setup function sets manager
@@ -174,7 +175,8 @@ contract SubscriptionModule is Module, SignatureDecoder {
 
         if (processPayment) {
 
-            if (value != 0 && (data.length == 32)) {//find a better type identifier to show these, first x bytes are something
+            if (value != 0 && (data.length == 32)) {
+                //find a better type identifier to show these, first x bytes are something
                 //if its 32 exactly, its likely just the one uint256, which means this is not a function call
                 uint256 conversionRate;
 
@@ -182,9 +184,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
                     data, (uint)
                 );
 
-                bytes32 rate = OracleRegistryI(oracleRegistry).read(
-                    oracleFeed
-                );
+                (bytes32 rate, address payable asset) = OracleRegistryI(oracleRegistry).read(oracleFeed);
 
                 conversionRate = uint256(rate);
 
@@ -192,13 +192,12 @@ contract SubscriptionModule is Module, SignatureDecoder {
                     conversionRate != uint(0),
                     "SubscriptionModule::_paySubscription: INVALID_FORMAT: CONVERSION_RATE"
                 );
-                data = "0x";
 
 
                 //when in priceFeed format, price feeds are denominated in Ether but converted to the feed pairing
-                //ETHUSD, WBTC/USD
+                //ETH/USD, WBTC/USD
                 require(
-                    value > 1.00 ether,
+                    value >= 0.50 ether,
                     "SubscriptionModule::_paySubscription: INVALID_FORMAT: DYNAMIC_PRICE_FORMAT"
                 );
 
@@ -213,7 +212,24 @@ contract SubscriptionModule is Module, SignatureDecoder {
                     payment
                 );
 
-                value = payment;
+                if (asset != address(0)) {
+
+                    //token receipient currently stored in the to field
+                    data = abi.encodeWithSignature(
+                        'transfer(address, uint256)',
+                        to,
+                        payment
+                    );
+
+                    //since its a token the transaction to field needs to be the asset smart contract
+                    //value is now 0 as well
+                    to = asset;
+                    value = 0;
+                } else {
+                    data = "0x"; //ether payment is just 0x for data
+                    value = payment; //set value to the converted payment
+                }
+
             }
 
             require(
@@ -457,7 +473,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
             if (startDate != 0 && startDate >= now) {
 
                 sub.nextWithdraw = startDate;
-
+                sub.startDate = startDate;
                 sub.status = GEnum.Status.TRIAL;
 
                 emit StatusChanged(
@@ -478,6 +494,7 @@ contract SubscriptionModule is Module, SignatureDecoder {
             } else {
 
                 sub.nextWithdraw = now;
+                sub.startDate = now;
                 sub.status = GEnum.Status.VALID;
                 emit StatusChanged(
                     hash,
